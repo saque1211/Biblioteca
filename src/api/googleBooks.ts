@@ -42,6 +42,52 @@ const GENRE_PT: Record<string, string> = {
   music: 'Música',
   'true crime': 'Crime real',
   humor: 'Humor',
+  // Subgêneros comuns de ficção (parte específica de "Fiction / …")
+  fantasy: 'Fantasia',
+  'science fiction': 'Ficção científica',
+  romance: 'Romance',
+  thrillers: 'Suspense',
+  suspense: 'Suspense',
+  'mystery & detective': 'Mistério',
+  horror: 'Terror',
+  classics: 'Clássicos',
+  'action & adventure': 'Ação e aventura',
+  adventure: 'Aventura',
+  dystopian: 'Distopia',
+  'short stories': 'Contos',
+  'coming of age': 'Amadurecimento',
+  historical: 'Histórico',
+  war: 'Guerra',
+  westerns: 'Faroeste',
+  erotica: 'Erótico',
+  'fairy tales, folk tales, legends & mythology': 'Contos e mitologia',
+  // Não ficção
+  'family & relationships': 'Família e relações',
+  'health & fitness': 'Saúde',
+  'sports & recreation': 'Esportes',
+  nature: 'Natureza',
+  pets: 'Animais de estimação',
+  'crafts & hobbies': 'Artesanato e hobbies',
+  'games & activities': 'Jogos',
+  'political science': 'Política',
+  law: 'Direito',
+  medical: 'Medicina',
+  mathematics: 'Matemática',
+  'technology & engineering': 'Tecnologia',
+  'foreign language study': 'Idiomas',
+  reference: 'Referência',
+  'juvenile nonfiction': 'Infantojuvenil',
+  'body, mind & spirit': 'Corpo, mente e espírito',
+  gardening: 'Jardinagem',
+  architecture: 'Arquitetura',
+  photography: 'Fotografia',
+  'performing arts': 'Artes cênicas',
+  'antiques & collectibles': 'Antiguidades e coleções',
+  bibles: 'Bíblias',
+  'literary collections': 'Coletâneas literárias',
+  'language arts & disciplines': 'Linguagem',
+  transportation: 'Transportes',
+  'house & home': 'Casa e lar',
 }
 
 function translateGenre(category?: string): string | undefined {
@@ -89,20 +135,26 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
   const digits = q.replace(/[-\s]/g, '')
   const isIsbn = /^\d{9}[\dXx]$|^\d{13}$/.test(digits)
   const finalQuery = isIsbn ? `isbn:${digits}` : q
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=8&printType=books&langRestrict=pt`
-  const res = await fetch(url, { signal })
-  if (!res.ok) throw new Error(`Google Books respondeu ${res.status}`)
-  const data = await res.json()
-  let items: GoogleVolume[] = data.items ?? []
+  const base = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=10&printType=books&country=BR`
 
-  // Se a busca restrita a PT não trouxe nada, tenta sem restrição de idioma
-  if (items.length === 0 && !isIsbn) {
-    const fallbackUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=8&printType=books`
-    const res2 = await fetch(fallbackUrl, { signal })
-    if (res2.ok) {
-      const data2 = await res2.json()
-      items = data2.items ?? []
-    }
+  async function fetchItems(url: string): Promise<GoogleVolume[]> {
+    const res = await fetch(url, { signal })
+    if (!res.ok) throw new Error(`Google Books respondeu ${res.status}`)
+    const data = await res.json()
+    return data.items ?? []
+  }
+
+  // Duas buscas em paralelo: edições em português primeiro, demais idiomas completando.
+  // ISBN identifica uma edição exata, então dispensa a busca restrita a PT.
+  const requests = isIsbn
+    ? [fetchItems(base)]
+    : [fetchItems(`${base}&langRestrict=pt`), fetchItems(base)]
+  const settled = await Promise.allSettled(requests)
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  const items = settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : []))
+  // Todas as chamadas falharam: propaga para acionar o fallback da Open Library
+  if (items.length === 0 && settled.every((s) => s.status === 'rejected')) {
+    throw (settled[0] as PromiseRejectedResult).reason
   }
 
   const results: ApiBookResult[] = []
@@ -115,5 +167,5 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
     seen.add(key)
     results.push(r)
   }
-  return results
+  return results.slice(0, 8)
 }
