@@ -135,7 +135,7 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
   const digits = q.replace(/[-\s]/g, '')
   const isIsbn = /^\d{9}[\dXx]$|^\d{13}$/.test(digits)
   const finalQuery = isIsbn ? `isbn:${digits}` : q
-  const base = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=10&printType=books&country=BR`
+  const base = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=10&printType=books`
 
   async function fetchItems(url: string): Promise<GoogleVolume[]> {
     const res = await fetch(url, { signal })
