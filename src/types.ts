@@ -67,6 +67,8 @@ export interface ApiBookResult {
   pageCount?: number
   synopsis?: string
   language?: string
+  /** Chave do "work" na Open Library (ex.: /works/OL456216W) para buscar a sinopse depois. */
+  workKey?: string
 }
 
 export const READING_STATUS_LABELS: Record<ReadingStatus, string> = {

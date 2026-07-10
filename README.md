@@ -8,7 +8,7 @@ encontre rápido, registre como cada livro chegou até você e monte sua agenda 
 - **React 18 + TypeScript + Vite**
 - **Tailwind CSS 4** — visual clean, modo claro/escuro
 - **Dexie.js (IndexedDB)** — os dados ficam salvos no navegador, funcionam offline e persistem entre sessões, sem backend
-- **Google Books API** — busca por título, autor ou ISBN com preenchimento automático (capa, gênero, editora, sinopse…)
+- **Google Books API + Open Library API** — busca por título, autor ou ISBN com preenchimento automático (capa, gênero, editora, sinopse…). A Google Books é consultada primeiro; se falhar ou não retornar nada, a busca cai automaticamente na [Open Library](https://openlibrary.org/developers/api). Ambas são gratuitas e sem chave de API
 
 ## Rodando
 
@@ -34,7 +34,10 @@ npm run preview  # serve o build
 
 ```
 src/
-├── api/googleBooks.ts    # busca na Google Books API
+├── api/
+│   ├── books.ts          # orquestrador: Google Books com fallback p/ Open Library
+│   ├── googleBooks.ts    # cliente da Google Books API
+│   └── openLibrary.ts    # cliente da Open Library API (busca + sinopse do work)
 ├── db/db.ts              # schema Dexie + operações (CRUD, backup)
 ├── hooks/                # tema claro/escuro, categoria em lote
 ├── components/

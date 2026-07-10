@@ -9,7 +9,8 @@ import { applyFilters, DEFAULT_FILTERS, FilterBar, type Filters } from './compon
 import { Header } from './components/Header'
 import { ManualAddModal } from './components/ManualAddModal'
 import { SearchBar } from './components/SearchBar'
-import { addBook, db } from './db/db'
+import { enrichSynopsis } from './api/books'
+import { addBook, db, updateBook } from './db/db'
 import { useBatchCategory } from './hooks/useBatchCategory'
 import { useTheme } from './hooks/useTheme'
 import type { ApiBookResult, Book } from './types'
@@ -47,7 +48,7 @@ export default function App() {
   }
 
   async function handleAddFromApi(result: ApiBookResult) {
-    await addBook({
+    const id = await addBook({
       title: result.title,
       authors: result.authors,
       coverUrl: result.coverUrl,
@@ -60,6 +61,12 @@ export default function App() {
       language: languageLabel(result.language),
       ...newBookDefaults(),
     })
+    // Resultados da Open Library não trazem sinopse na busca; completa em segundo plano
+    if (!result.synopsis && result.workKey) {
+      enrichSynopsis(result).then((synopsis) => {
+        if (synopsis) updateBook(id, { synopsis })
+      })
+    }
   }
 
   async function handleAddManually(data: Pick<Book, 'title' | 'authors' | 'coverUrl' | 'genre' | 'isbn' | 'publisher' | 'publishedYear' | 'pageCount' | 'synopsis'>) {
@@ -118,7 +125,7 @@ export default function App() {
       </main>
 
       <footer className="pb-8 text-center text-xs text-ink-400 dark:text-ink-500">
-        Seus dados ficam salvos apenas neste dispositivo (IndexedDB) · Dados bibliográficos via Google Books
+        Seus dados ficam salvos apenas neste dispositivo (IndexedDB) · Dados bibliográficos via Google Books e Open Library
       </footer>
 
       {selectedBook && <BookDetailPanel book={selectedBook} onClose={() => setSelectedId(null)} />}

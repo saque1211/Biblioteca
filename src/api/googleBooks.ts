@@ -82,7 +82,7 @@ function toResult(v: GoogleVolume): ApiBookResult | null {
  * Busca livros na Google Books API (sem chave, endpoint público).
  * Aceita título, autor ou ISBN.
  */
-export async function searchBooks(query: string, signal?: AbortSignal): Promise<ApiBookResult[]> {
+export async function searchGoogleBooks(query: string, signal?: AbortSignal): Promise<ApiBookResult[]> {
   const q = query.trim()
   if (!q) return []
   // Se parece um ISBN, busca direta por identificador

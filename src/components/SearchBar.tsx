@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { searchBooks } from '../api/googleBooks'
+import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
 import { Cover } from './ui/Cover'
