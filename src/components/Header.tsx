@@ -1,0 +1,181 @@
+import { useRef, useState } from 'react'
+import { exportLibrary, importLibrary, type LibraryBackup } from '../db/db'
+import type { Book } from '../types'
+import { formatCurrency } from '../utils/format'
+
+interface HeaderProps {
+  books: Book[]
+  view: 'library' | 'calendar'
+  onViewChange: (view: 'library' | 'calendar') => void
+  theme: 'light' | 'dark'
+  onToggleTheme: () => void
+  batchCategory: string | null
+  onOpenBatchCategory: () => void
+  onClearBatchCategory: () => void
+}
+
+export function Header({
+  books,
+  view,
+  onViewChange,
+  theme,
+  onToggleTheme,
+  batchCategory,
+  onOpenBatchCategory,
+  onClearBatchCategory,
+}: HeaderProps) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+
+  const total = books.length
+  const read = books.filter((b) => b.readingStatus === 'lido').length
+  const invested = books.reduce((sum, b) => sum + (b.pricePaid ?? 0), 0)
+
+  async function handleExport() {
+    const data = await exportLibrary()
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `biblioteca-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleImportFile(file: File) {
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text) as LibraryBackup
+      if (total > 0 && !confirm(`Importar substituirá seus ${total} livros atuais. Continuar?`)) return
+      const { books: n } = await importLibrary(data)
+      setImportMsg(`${n} livros importados ✓`)
+    } catch {
+      setImportMsg('Arquivo inválido')
+    }
+    setTimeout(() => setImportMsg(null), 3000)
+  }
+
+  const tabClass = (active: boolean) =>
+    `rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+      active
+        ? 'bg-ink-800 text-paper-50 dark:bg-paper-100 dark:text-ink-800'
+        : 'text-ink-500 hover:bg-paper-200/70 hover:text-ink-700 dark:text-ink-400 dark:hover:bg-ink-700 dark:hover:text-paper-200'
+    }`
+
+  return (
+    <header className="border-b border-paper-200/80 bg-white/70 backdrop-blur-md dark:border-ink-700 dark:bg-ink-900/70">
+      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-600 text-lg text-white shadow-card">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-serif text-lg font-semibold leading-tight text-ink-800 dark:text-paper-100">
+                Minha Biblioteca
+              </h1>
+              <p className="text-xs text-ink-500 dark:text-ink-400">
+                {total} {total === 1 ? 'livro' : 'livros'} · {read} {read === 1 ? 'lido' : 'lidos'}
+                {invested > 0 && <> · {formatCurrency(invested)} investidos</>}
+              </p>
+            </div>
+          </div>
+
+          <nav className="order-3 flex w-full justify-center gap-1 rounded-full bg-paper-100 p-1 dark:bg-ink-800 sm:order-none sm:w-auto" aria-label="Seções">
+            <button type="button" className={tabClass(view === 'library')} onClick={() => onViewChange('library')}>
+              Biblioteca
+            </button>
+            <button type="button" className={tabClass(view === 'calendar')} onClick={() => onViewChange('calendar')}>
+              Agenda de leitura
+            </button>
+          </nav>
+
+          <div className="flex items-center gap-1.5">
+            {importMsg && <span className="text-xs text-accent-600 dark:text-accent-400">{importMsg}</span>}
+            <IconButton title="Exportar biblioteca (JSON)" onClick={handleExport}>
+              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+            </IconButton>
+            <IconButton title="Importar biblioteca (JSON)" onClick={() => fileRef.current?.click()}>
+              <path d="M12 15V3m0 0L8 7m4-4l4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+            </IconButton>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleImportFile(f)
+                e.target.value = ''
+              }}
+            />
+            <IconButton title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} onClick={onToggleTheme}>
+              {theme === 'dark' ? (
+                <>
+                  <circle cx="12" cy="12" r="4.5" />
+                  <path d="M12 2.5v2m0 15v2m9.5-9.5h-2m-15 0h-2m16.3-6.8l-1.5 1.5M6.7 17.3l-1.5 1.5m0-13.6l1.5 1.5m10.6 10.6l1.5 1.5" strokeLinecap="round" />
+                </>
+              ) : (
+                <path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" strokeLinejoin="round" />
+              )}
+            </IconButton>
+          </div>
+        </div>
+
+        {/* Chip da categoria em lote ativa */}
+        <div className="mt-3 flex justify-center">
+          {batchCategory ? (
+            <div className="flex animate-pop items-center gap-2 rounded-full border border-accent-200 bg-accent-100 py-1.5 pl-4 pr-2 text-sm text-accent-700 shadow-card dark:border-accent-700/50 dark:bg-accent-700/25 dark:text-accent-200">
+              <span>
+                Adicionando como: <strong className="font-semibold">{batchCategory}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={onClearBatchCategory}
+                title="Desativar categoria em lote"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-accent-600 transition-colors hover:bg-accent-200 dark:text-accent-300 dark:hover:bg-accent-700/50"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenBatchCategory}
+              className="rounded-full border border-dashed border-paper-300 px-4 py-1.5 text-xs text-ink-500 transition-colors hover:border-accent-400 hover:text-accent-600 dark:border-ink-600 dark:text-ink-400 dark:hover:border-accent-500 dark:hover:text-accent-400"
+            >
+              + Ativar categoria de aquisição em lote
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}
+
+function IconButton({
+  title,
+  onClick,
+  children,
+}: {
+  title: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-paper-200/70 hover:text-ink-700 dark:text-ink-400 dark:hover:bg-ink-700 dark:hover:text-paper-200"
+    >
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.7}>
+        {children}
+      </svg>
+    </button>
+  )
+}
