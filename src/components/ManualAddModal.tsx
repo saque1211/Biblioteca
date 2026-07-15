@@ -22,9 +22,21 @@ export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalP
   const [coverUrl, setCoverUrl] = useState('')
   const [synopsis, setSynopsis] = useState('')
 
+  const [saveError, setSaveError] = useState(false)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
+    try {
+      await doAdd()
+    } catch {
+      setSaveError(true)
+      return
+    }
+    onClose()
+  }
+
+  async function doAdd() {
     await onAdd({
       title: title.trim(),
       authors: authors.split(',').map((a) => a.trim()).filter(Boolean),
@@ -36,7 +48,6 @@ export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalP
       coverUrl: coverUrl || undefined,
       synopsis: synopsis.trim() || undefined,
     })
-    onClose()
   }
 
   return (
@@ -71,6 +82,11 @@ export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalP
         <Field label="Sinopse">
           <TextArea rows={3} value={synopsis} onChange={(e) => setSynopsis(e.target.value)} />
         </Field>
+        {saveError && (
+          <p className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+            Não foi possível salvar o livro. Feche o app completamente e abra de novo — se continuar, recarregue a página.
+          </p>
+        )}
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"

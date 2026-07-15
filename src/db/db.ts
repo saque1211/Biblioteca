@@ -38,6 +38,26 @@ class BibliotecaDB extends Dexie {
 
 export const db = new BibliotecaDB()
 
+export type DbStatus = 'ok' | 'version-error' | 'blocked' | 'error'
+
+/**
+ * Confere se o banco abre nesta versão do app.
+ * - 'blocked': outra janela/aba do app (possivelmente congelada em segundo
+ *   plano no celular) segura o banco e impede a migração — a abertura fica
+ *   pendurada para sempre; detectamos por tempo limite.
+ * - 'version-error': versão antiga do app (em cache) com banco já migrado.
+ */
+export async function ensureDbOpen(timeoutMs = 4000): Promise<DbStatus> {
+  const timeout = new Promise<'blocked'>((resolve) => setTimeout(() => resolve('blocked'), timeoutMs))
+  const open = db
+    .open()
+    .then((): DbStatus => 'ok')
+    .catch((err): DbStatus =>
+      err instanceof Error && err.name === 'VersionError' ? 'version-error' : 'error',
+    )
+  return Promise.race([open, timeout])
+}
+
 export async function addBook(book: Omit<Book, 'id'>): Promise<number> {
   return db.books.add(book as Book)
 }

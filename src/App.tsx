@@ -14,7 +14,7 @@ import { ManualAddModal } from './components/ManualAddModal'
 import { SearchBar } from './components/SearchBar'
 import { SettingsModal } from './components/SettingsModal'
 import { StatsView } from './components/StatsView'
-import { addBook, db, deleteBook, updateBook } from './db/db'
+import { addBook, db, deleteBook, ensureDbOpen, updateBook, type DbStatus } from './db/db'
 import { useBatchCategory } from './hooks/useBatchCategory'
 import { useSettings } from './hooks/useSettings'
 import { useTheme } from './hooks/useTheme'
@@ -39,6 +39,27 @@ export default function App() {
   const [selection, setSelection] = useState<Set<number>>(new Set())
   const [bulkEditOpen, setBulkEditOpen] = useState(false)
   const selectionMode = selection.size > 0
+
+  // Saúde do banco: uma versão antiga do app (em cache) com banco já migrado
+  // falharia silenciosamente — detecta, tenta recarregar sozinho uma vez e,
+  // se não resolver, mostra instruções em vez de quebrar calado
+  const [dbStatus, setDbStatus] = useState<DbStatus>('ok')
+  useEffect(() => {
+    ensureDbOpen().then((status) => {
+      const key = 'biblioteca-auto-reloaded'
+      if (status === 'ok') {
+        sessionStorage.removeItem(key)
+        setDbStatus('ok')
+        return
+      }
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, '1')
+        location.reload()
+        return
+      }
+      setDbStatus(status)
+    })
+  }, [])
 
   const books = useLiveQuery(() => db.books.toArray(), []) ?? []
   const selectedBook = useMemo(
@@ -145,6 +166,34 @@ export default function App() {
     if (!confirm(`Remover ${selection.size} livros da biblioteca?`)) return
     for (const id of selection) await deleteBook(id)
     setSelection(new Set())
+  }
+
+  if (dbStatus !== 'ok') {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="max-w-md animate-pop rounded-2xl border border-paper-200/80 bg-white p-6 text-center shadow-card dark:border-ink-700 dark:bg-ink-800">
+          <p className="text-3xl">🔄</p>
+          <h1 className="mt-3 font-serif text-lg font-semibold text-ink-800 dark:text-paper-100">
+            O app precisa se atualizar
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
+            {dbStatus === 'version-error' &&
+              'Este aparelho ainda está com uma versão antiga do app em cache. Seus livros estão seguros — toque em recarregar (pode precisar de 2 vezes) ou feche o app completamente e abra de novo.'}
+            {dbStatus === 'blocked' &&
+              'Outra janela deste app está segurando o armazenamento. Feche as outras abas do navegador com a biblioteca aberta (e o app da tela inicial, se estiver aberto em dois lugares) e toque em recarregar. Seus livros estão seguros.'}
+            {dbStatus === 'error' &&
+              'Não foi possível abrir o armazenamento. Feche outras abas/janelas deste app e toque em recarregar.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => location.reload()}
+            className="mt-4 rounded-xl bg-accent-600 px-6 py-2.5 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.98]"
+          >
+            Recarregar agora
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -64,7 +64,12 @@ export function SearchBar({ onSelect, onAddManually, batchCategory }: SearchBarP
   }, [])
 
   async function handleSelect(result: ApiBookResult) {
-    await onSelect(result)
+    try {
+      await onSelect(result)
+    } catch {
+      setError('Não foi possível salvar o livro. Feche o app completamente e abra de novo — se continuar, recarregue a página.')
+      return
+    }
     setJustAdded(result.title)
     setQuery('')
     setResults([])
