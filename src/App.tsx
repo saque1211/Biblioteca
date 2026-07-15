@@ -102,9 +102,11 @@ export default function App() {
         if (Object.keys(changes).length) updateBook(id, changes)
       })
     }
+    // Detecção automática de idioma: traduz o título mesmo quando o catálogo
+    // não informa (ou informa errado) o idioma do livro
     const sourceLang = toMyMemoryLang(result.language)
-    if (settings.translateTitles && sourceLang && sourceLang !== 'pt-BR') {
-      translateText(result.title, sourceLang, 'pt-BR').then((translated) => {
+    if (settings.translateTitles && sourceLang !== 'pt-BR') {
+      translateText(result.title, sourceLang ?? 'auto', 'pt-BR').then((translated) => {
         if (translated) updateBook(id, { title: translated, originalTitle: result.title })
       })
     }

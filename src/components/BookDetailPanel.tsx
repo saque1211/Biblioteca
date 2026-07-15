@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { translateText } from '../api/translate'
 import { deleteBook, updateBook } from '../db/db'
 import type { Book, BookCondition, BookFormat, Origin, ReadingStatus } from '../types'
 import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
@@ -21,6 +22,8 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
   const [draft, setDraft] = useState<Book>(book)
   const [tagInput, setTagInput] = useState('')
   const [saved, setSaved] = useState(false)
+  const [translating, setTranslating] = useState(false)
+  const [translateMsg, setTranslateMsg] = useState<string | null>(null)
 
   useEffect(() => {
     setDraft(book)
@@ -52,6 +55,20 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
     if (!confirm(`Remover “${book.title}” da biblioteca?`)) return
     await deleteBook(book.id)
     onClose()
+  }
+
+  async function handleTranslateTitle() {
+    setTranslating(true)
+    setTranslateMsg(null)
+    const translated = await translateText(draft.title, 'auto', 'pt-BR')
+    setTranslating(false)
+    if (translated) {
+      setDraft((d) => ({ ...d, title: translated, originalTitle: d.originalTitle ?? d.title }))
+      setTranslateMsg('Traduzido — salve para confirmar')
+    } else {
+      setTranslateMsg('Já está em português ou a tradução está indisponível agora')
+    }
+    setTimeout(() => setTranslateMsg(null), 4000)
   }
 
   function addTag() {
@@ -259,6 +276,17 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
               <Field label="Título">
                 <TextInput value={draft.title} onChange={(e) => set('title', e.target.value)} />
               </Field>
+              <div className="mt-1.5 flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={translating}
+                  onClick={handleTranslateTitle}
+                  className="text-xs font-medium text-accent-600 underline-offset-2 hover:underline disabled:opacity-50 dark:text-accent-400"
+                >
+                  {translating ? 'Traduzindo…' : '🌐 Traduzir título para o português'}
+                </button>
+                {translateMsg && <span className="animate-fade-in text-xs text-ink-400 dark:text-ink-500">{translateMsg}</span>}
+              </div>
             </div>
             <div className="col-span-2">
               <Field label="Autor(es) — separados por vírgula">
