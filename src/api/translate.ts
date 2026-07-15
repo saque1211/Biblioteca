@@ -6,23 +6,40 @@
  * segue sem tradução.
  */
 
+export interface TranslationResult {
+  /** false = serviço indisponível (vale tentar de novo depois) */
+  available: boolean
+  /** tradução; undefined com available=true significa "já está no idioma de destino" */
+  translated?: string
+}
+
 /** `from` aceita 'auto' para detectar o idioma de origem. */
+export async function translateWithStatus(
+  text: string,
+  from: string,
+  to: string,
+  timeoutMs = 6000,
+): Promise<TranslationResult> {
+  const trimmed = text.trim()
+  if (!trimmed || from === to) return { available: true }
+  const src = toGoogleLang(from)
+  const dst = toGoogleLang(to)
+
+  const viaGoogle = await googleTranslate(trimmed, src, dst, timeoutMs)
+  if (viaGoogle !== null) return { available: true, translated: viaGoogle || undefined }
+
+  // Google indisponível: tenta o MyMemory
+  const viaMyMemory = await myMemoryTranslate(trimmed, from, to, timeoutMs)
+  return viaMyMemory ? { available: true, translated: viaMyMemory } : { available: false }
+}
+
 export async function translateText(
   text: string,
   from: string,
   to: string,
   timeoutMs = 6000,
 ): Promise<string | undefined> {
-  const trimmed = text.trim()
-  if (!trimmed || from === to) return undefined
-  const src = toGoogleLang(from)
-  const dst = toGoogleLang(to)
-
-  const viaGoogle = await googleTranslate(trimmed, src, dst, timeoutMs)
-  if (viaGoogle !== null) return viaGoogle || undefined
-
-  // Google indisponível: tenta o MyMemory
-  return myMemoryTranslate(trimmed, from, to, timeoutMs)
+  return (await translateWithStatus(text, from, to, timeoutMs)).translated
 }
 
 /**

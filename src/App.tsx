@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { enrichBookDetails } from './api/books'
 import { toMyMemoryLang, translateText } from './api/translate'
@@ -21,6 +21,7 @@ import { useTheme } from './hooks/useTheme'
 import type { ApiBookResult, Book } from './types'
 import { formatDate, todayISO } from './utils/format'
 import { overdueBooks } from './utils/loans'
+import { retroTranslateTitles } from './utils/retroTranslate'
 
 export default function App() {
   const { theme, toggleTheme } = useTheme()
@@ -50,6 +51,15 @@ export default function App() {
     [books, selection],
   )
   const overdue = useMemo(() => overdueBooks(books), [books])
+
+  // Tradução retroativa: livros salvos antes da tradução automática (ou com
+  // o serviço indisponível na época) ganham título em português ao abrir o app
+  const retroRan = useRef(false)
+  useEffect(() => {
+    if (retroRan.current || !settings.translateTitles || books.length === 0) return
+    retroRan.current = true
+    retroTranslateTitles(books)
+  }, [books, settings.translateTitles])
 
   // Notificação do sistema para atrasos (uma vez por dia, ao abrir o app)
   useEffect(() => {
@@ -113,7 +123,12 @@ export default function App() {
   }
 
   async function handleAddManually(data: Pick<Book, 'title' | 'authors' | 'coverUrl' | 'genre' | 'isbn' | 'publisher' | 'publishedYear' | 'pageCount' | 'synopsis'>) {
-    await addBook({ ...data, ...newBookDefaults() })
+    const id = await addBook({ ...data, ...newBookDefaults() })
+    if (settings.translateTitles) {
+      translateText(data.title, 'auto', 'pt-BR').then((translated) => {
+        if (translated) updateBook(id, { title: translated, originalTitle: data.title })
+      })
+    }
   }
 
   function toggleSelect(book: Book) {
