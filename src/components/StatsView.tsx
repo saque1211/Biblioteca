@@ -31,8 +31,36 @@ export function StatsView({ books }: StatsViewProps) {
     let completedLoans = 0
     let activeCount = 0
     let overdueCount = 0
+    let inClassCount = 0
+
+    function countCompletedReading(name: string, book: Book) {
+      completedLoans++
+      const r = readers.get(name) ?? { label: name, count: 0 }
+      r.count++
+      readers.set(name, r)
+
+      const key = `${book.id}`
+      const m = mostRead.get(key) ?? {
+        label: book.title,
+        count: 0,
+        cover: { url: book.coverUrl, title: book.title },
+      }
+      m.count++
+      mostRead.set(key, m)
+
+      if (book.genre) {
+        const g = genresRead.get(book.genre) ?? { label: book.genre, count: 0 }
+        g.count++
+        genresRead.set(book.genre, g)
+      }
+    }
 
     for (const book of books) {
+      // Leituras em aula: concluídas contam como leitura completa da criança
+      for (const reading of book.classReadings ?? []) {
+        if (reading.finishedAt) countCompletedReading(reading.name.trim() || 'Sem nome', book)
+        else inClassCount++
+      }
       for (const loan of book.loans ?? []) {
         totalLoans++
         const name = loan.name.trim() || 'Sem nome'
@@ -43,27 +71,7 @@ export function StatsView({ books }: StatsViewProps) {
         const b = borrowers.get(name) ?? { label: name, count: 0 }
         b.count++
         borrowers.set(name, b)
-        if (loan.completed) {
-          completedLoans++
-          const r = readers.get(name) ?? { label: name, count: 0 }
-          r.count++
-          readers.set(name, r)
-
-          const key = `${book.id}`
-          const m = mostRead.get(key) ?? {
-            label: book.title,
-            count: 0,
-            cover: { url: book.coverUrl, title: book.title },
-          }
-          m.count++
-          mostRead.set(key, m)
-
-          if (book.genre) {
-            const g = genresRead.get(book.genre) ?? { label: book.genre, count: 0 }
-            g.count++
-            genresRead.set(book.genre, g)
-          }
-        }
+        if (loan.completed) countCompletedReading(name, book)
       }
     }
 
@@ -93,6 +101,7 @@ export function StatsView({ books }: StatsViewProps) {
       completedLoans,
       activeCount,
       overdueCount,
+      inClassCount,
       readers: rank(readers),
       borrowers: rank(borrowers),
       mostRead: rank(mostRead),
@@ -116,7 +125,7 @@ export function StatsView({ books }: StatsViewProps) {
       {/* Cartões de resumo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryCard value={stats.totalBooks} label="livros no acervo" />
-        <SummaryCard value={stats.completedLoans} label="leituras completas" />
+        <SummaryCard value={stats.completedLoans} label="leituras completas" highlight={stats.inClassCount > 0 ? `${stats.inClassCount} lendo em aula` : undefined} highlightTone="info" />
         <SummaryCard value={stats.activeCount} label="emprestados agora" highlight={stats.overdueCount > 0 ? `${stats.overdueCount} em atraso` : undefined} />
         <SummaryCard value={formatCurrency(stats.invested)} label="investidos no acervo" small />
       </div>
@@ -147,12 +156,16 @@ export function StatsView({ books }: StatsViewProps) {
   )
 }
 
-function SummaryCard({ value, label, highlight, small }: { value: number | string; label: string; highlight?: string; small?: boolean }) {
+function SummaryCard({ value, label, highlight, highlightTone = 'alert', small }: { value: number | string; label: string; highlight?: string; highlightTone?: 'alert' | 'info'; small?: boolean }) {
   return (
     <div className="rounded-2xl border border-paper-200/80 bg-white p-4 text-center shadow-card dark:border-ink-700 dark:bg-ink-800">
       <p className={`font-serif font-semibold text-ink-800 dark:text-paper-100 ${small ? 'text-lg' : 'text-2xl'}`}>{value}</p>
       <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">{label}</p>
-      {highlight && <p className="mt-1 text-[11px] font-semibold text-rose-500">{highlight}</p>}
+      {highlight && (
+        <p className={`mt-1 text-[11px] font-semibold ${highlightTone === 'alert' ? 'text-rose-500' : 'text-sky-600 dark:text-sky-400'}`}>
+          {highlight}
+        </p>
+      )}
     </div>
   )
 }

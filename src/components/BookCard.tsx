@@ -45,6 +45,7 @@ export function BookCard({ book, onOpen, selectionMode, selected, onToggleSelect
 
   const loan = activeLoan(book)
   const overdue = isOverdue(loan)
+  const inClass = (book.classReadings ?? []).filter((r) => !r.finishedAt)
 
   return (
     <button
@@ -97,6 +98,13 @@ export function BookCard({ book, onOpen, selectionMode, selected, onToggleSelect
           <StatusBadge status={book.readingStatus} />
           {loan && !overdue && <Badge tone="amber">Com {loan.name}</Badge>}
           {overdue && <Badge tone="red">Atrasado · {loan!.name}</Badge>}
+          {inClass.length === 1 && (
+            <Badge tone="blue">
+              Em aula · {inClass[0].name || 'sem nome'}
+              {inClass[0].currentPage ? ` (pág. ${inClass[0].currentPage})` : ''}
+            </Badge>
+          )}
+          {inClass.length > 1 && <Badge tone="blue">Em aula · {inClass.length} crianças</Badge>}
         </div>
 
         {book.rating > 0 && (

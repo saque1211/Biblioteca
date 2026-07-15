@@ -6,7 +6,7 @@ import { Select, TextInput } from './ui/Field'
 
 export type SortKey = 'title' | 'author' | 'acquisitionDate' | 'rating' | 'price' | 'addedAt'
 
-export type LoanFilter = '' | 'emprestado' | 'atrasado' | 'disponivel'
+export type LoanFilter = '' | 'emprestado' | 'atrasado' | 'disponivel' | 'em-aula'
 
 export interface Filters {
   text: string
@@ -75,6 +75,7 @@ export function applyFilters(books: Book[], f: Filters): Book[] {
       if (f.loan === 'emprestado' && !loan) return false
       if (f.loan === 'disponivel' && loan) return false
       if (f.loan === 'atrasado' && !isOverdue(loan)) return false
+      if (f.loan === 'em-aula' && !(b.classReadings ?? []).some((r) => !r.finishedAt)) return false
     }
     if (f.language && (b.language ?? '').toLowerCase() !== f.language.toLowerCase()) return false
     if (f.tag && !b.tags.includes(f.tag)) return false
@@ -205,6 +206,7 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
             <option value="">Empréstimo: todos</option>
             <option value="emprestado">Emprestados agora</option>
             <option value="atrasado">Devolução atrasada</option>
+            <option value="em-aula">Em leitura em aula</option>
             <option value="disponivel">Disponíveis</option>
           </Select>
           <Select value={filters.origin} aria-label="Origem" onChange={(e) => set('origin', e.target.value as Filters['origin'])}>

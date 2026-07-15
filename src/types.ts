@@ -13,6 +13,16 @@ export interface LoanRecord {
   completed?: boolean // true = leu por completo
 }
 
+/** Leitura feita em aula (o livro fica na biblioteca): marca onde a criança parou. */
+export interface ClassReading {
+  id: string
+  name: string // criança
+  currentPage?: number // página em que parou
+  startedAt: string
+  updatedAt: string
+  finishedAt?: string // preenchido quando concluiu a leitura
+}
+
 export interface Book {
   id?: number
   // Dados bibliográficos (vindos da API ou manuais)
@@ -48,6 +58,8 @@ export interface Book {
 
   // Empréstimos (o ativo é o que não tem returnedAt)
   loans?: LoanRecord[]
+  // Leituras em aula (as ativas são as sem finishedAt)
+  classReadings?: ClassReading[]
   /** @deprecated campos antigos, migrados para `loans` */
   loanedTo?: string
   /** @deprecated */

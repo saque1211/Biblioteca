@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { translateText } from '../api/translate'
 import { deleteBook, updateBook } from '../db/db'
-import type { Book, BookCondition, BookFormat, LoanRecord, Origin, ReadingStatus } from '../types'
+import type { Book, BookCondition, BookFormat, ClassReading, LoanRecord, Origin, ReadingStatus } from '../types'
 import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
 import { authorsLabel } from '../utils/format'
+import { ClassReadingSection } from './ClassReadingSection'
 import { LoanSection } from './LoanSection'
 import { Badge } from './ui/Badge'
 import { Cover } from './ui/Cover'
@@ -40,6 +41,12 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
   function setLoansNow(loans: LoanRecord[]) {
     setDraft((d) => ({ ...d, loans }))
     if (book.id != null) updateBook(book.id, { loans })
+  }
+
+  /** Leituras em aula também gravam na hora (página em que parou, conclusão). */
+  function setClassReadingsNow(classReadings: ClassReading[]) {
+    setDraft((d) => ({ ...d, classReadings }))
+    if (book.id != null) updateBook(book.id, { classReadings })
   }
 
   // Fecha com Esc
@@ -230,6 +237,9 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
               </Field>
             </div>
           </div>
+
+          <SectionTitle>Leitura em aula</SectionTitle>
+          <ClassReadingSection draft={draft} onChange={setClassReadingsNow} />
 
           <SectionTitle>Empréstimo</SectionTitle>
           <LoanSection draft={draft} onChange={setLoansNow} askReadOnReturn={askReadOnReturn} />
