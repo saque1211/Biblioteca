@@ -6,11 +6,27 @@ const baseInput =
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-        {label}
-      </span>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </label>
+  )
+}
+
+/** Como o Field, mas sem <label> — para grupos com vários controles internos. */
+export function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      {children}
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+      {children}
+    </span>
   )
 }
 

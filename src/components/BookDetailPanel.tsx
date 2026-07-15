@@ -6,7 +6,8 @@ import { authorsLabel } from '../utils/format'
 import { LoanSection } from './LoanSection'
 import { Badge } from './ui/Badge'
 import { Cover } from './ui/Cover'
-import { Field, Select, TextArea, TextInput } from './ui/Field'
+import { CoverPicker } from './ui/CoverPicker'
+import { Field, FieldGroup, Select, TextArea, TextInput } from './ui/Field'
 import { StarRating } from './ui/StarRating'
 
 interface BookDetailPanelProps {
@@ -286,9 +287,11 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
                 onChange={(e) => set('pageCount', e.target.value === '' ? undefined : Number(e.target.value))}
               />
             </Field>
-            <Field label="URL da capa">
-              <TextInput value={draft.coverUrl ?? ''} onChange={(e) => set('coverUrl', e.target.value || undefined)} />
-            </Field>
+            <div className="col-span-2">
+              <FieldGroup label="Capa">
+                <CoverPicker value={draft.coverUrl} title={draft.title} onChange={(v) => set('coverUrl', v)} />
+              </FieldGroup>
+            </div>
           </div>
 
           <button

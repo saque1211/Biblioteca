@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Book } from '../types'
-import { Field, TextArea, TextInput } from './ui/Field'
+import { CoverPicker } from './ui/CoverPicker'
+import { Field, FieldGroup, TextArea, TextInput } from './ui/Field'
 import { Modal } from './ui/Modal'
 
 interface ManualAddModalProps {
@@ -32,7 +33,7 @@ export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalP
       publisher: publisher.trim() || undefined,
       publishedYear: publishedYear.trim() || undefined,
       pageCount: pageCount === '' ? undefined : Number(pageCount),
-      coverUrl: coverUrl.trim() || undefined,
+      coverUrl: coverUrl || undefined,
       synopsis: synopsis.trim() || undefined,
     })
     onClose()
@@ -63,10 +64,10 @@ export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalP
           <Field label="Nº de páginas">
             <TextInput type="number" min={0} value={pageCount} onChange={(e) => setPageCount(e.target.value)} />
           </Field>
-          <Field label="URL da capa">
-            <TextInput value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://…" />
-          </Field>
         </div>
+        <FieldGroup label="Capa">
+          <CoverPicker value={coverUrl || undefined} title={title} onChange={(v) => setCoverUrl(v ?? '')} />
+        </FieldGroup>
         <Field label="Sinopse">
           <TextArea rows={3} value={synopsis} onChange={(e) => setSynopsis(e.target.value)} />
         </Field>
