@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
-import type { Book, BookFormat, Origin, ReadingStatus } from '../types'
-import { FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
+import type { Book, BookCondition, BookFormat, Origin, ReadingStatus } from '../types'
+import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
+import { activeLoan, isOverdue } from '../utils/loans'
 import { Select, TextInput } from './ui/Field'
 
 export type SortKey = 'title' | 'author' | 'acquisitionDate' | 'rating' | 'price' | 'addedAt'
+
+export type LoanFilter = '' | 'emprestado' | 'atrasado' | 'disponivel'
 
 export interface Filters {
   text: string
@@ -17,6 +20,11 @@ export interface Filters {
   priceMin: string
   priceMax: string
   format: '' | BookFormat
+  loan: LoanFilter
+  language: string
+  tag: string
+  condition: '' | BookCondition
+  publisher: string
   sort: SortKey
   sortAsc: boolean
 }
@@ -33,6 +41,11 @@ export const DEFAULT_FILTERS: Filters = {
   priceMin: '',
   priceMax: '',
   format: '',
+  loan: '',
+  language: '',
+  tag: '',
+  condition: '',
+  publisher: '',
   sort: 'addedAt',
   sortAsc: false,
 }
@@ -57,6 +70,16 @@ export function applyFilters(books: Book[], f: Filters): Book[] {
       if (price < min || price > max) return false
     }
     if (f.format && b.format !== f.format) return false
+    if (f.loan) {
+      const loan = activeLoan(b)
+      if (f.loan === 'emprestado' && !loan) return false
+      if (f.loan === 'disponivel' && loan) return false
+      if (f.loan === 'atrasado' && !isOverdue(loan)) return false
+    }
+    if (f.language && (b.language ?? '').toLowerCase() !== f.language.toLowerCase()) return false
+    if (f.tag && !b.tags.includes(f.tag)) return false
+    if (f.condition && b.condition !== f.condition) return false
+    if (f.publisher && b.publisher !== f.publisher) return false
     return true
   })
 
@@ -101,14 +124,14 @@ interface FilterBarProps {
 export function FilterBar({ books, filters, onChange, resultCount }: FilterBarProps) {
   const [expanded, setExpanded] = useState(false)
 
-  const genres = useMemo(
-    () => [...new Set(books.map((b) => b.genre).filter((g): g is string => !!g))].sort(),
-    [books],
-  )
-  const categories = useMemo(
-    () => [...new Set(books.map((b) => b.acquisitionCategory).filter((c): c is string => !!c))].sort(),
-    [books],
-  )
+  const distinct = (values: (string | undefined)[]) =>
+    [...new Set(values.filter((v): v is string => !!v))].sort(new Intl.Collator('pt-BR').compare)
+
+  const genres = useMemo(() => distinct(books.map((b) => b.genre)), [books])
+  const categories = useMemo(() => distinct(books.map((b) => b.acquisitionCategory)), [books])
+  const languages = useMemo(() => distinct(books.map((b) => b.language)), [books])
+  const tags = useMemo(() => distinct(books.flatMap((b) => b.tags)), [books])
+  const publishers = useMemo(() => distinct(books.map((b) => b.publisher)), [books])
 
   function set<K extends keyof Filters>(key: K, value: Filters[K]) {
     onChange({ ...filters, [key]: value })
@@ -117,6 +140,7 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
   const activeCount = [
     filters.genre, filters.status, filters.acquisitionCategory, filters.origin,
     filters.author, filters.priceMin, filters.priceMax, filters.format,
+    filters.loan, filters.language, filters.tag, filters.condition, filters.publisher,
     filters.minRating > 0 ? 'r' : '', filters.favoritesOnly ? 'f' : '',
   ].filter(Boolean).length
 
@@ -174,8 +198,14 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
             {Object.entries(READING_STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </Select>
           <Select value={filters.acquisitionCategory} aria-label="Categoria de aquisição" onChange={(e) => set('acquisitionCategory', e.target.value)}>
-            <option value="">Categoria: todas</option>
+            <option value="">Doador/categoria: todos</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+          <Select value={filters.loan} aria-label="Situação de empréstimo" onChange={(e) => set('loan', e.target.value as LoanFilter)}>
+            <option value="">Empréstimo: todos</option>
+            <option value="emprestado">Emprestados agora</option>
+            <option value="atrasado">Devolução atrasada</option>
+            <option value="disponivel">Disponíveis</option>
           </Select>
           <Select value={filters.origin} aria-label="Origem" onChange={(e) => set('origin', e.target.value as Filters['origin'])}>
             <option value="">Origem: todas</option>
@@ -189,6 +219,28 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
             <option value="0">Avaliação: todas</option>
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{'★'.repeat(n)} ou mais</option>)}
           </Select>
+          <Select value={filters.condition} aria-label="Estado de conservação" onChange={(e) => set('condition', e.target.value as Filters['condition'])}>
+            <option value="">Conservação: todas</option>
+            {Object.entries(CONDITION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </Select>
+          {languages.length > 0 && (
+            <Select value={filters.language} aria-label="Idioma" onChange={(e) => set('language', e.target.value)}>
+              <option value="">Idioma: todos</option>
+              {languages.map((l) => <option key={l} value={l}>{l}</option>)}
+            </Select>
+          )}
+          {tags.length > 0 && (
+            <Select value={filters.tag} aria-label="Tag" onChange={(e) => set('tag', e.target.value)}>
+              <option value="">Tag: todas</option>
+              {tags.map((t) => <option key={t} value={t}>{t}</option>)}
+            </Select>
+          )}
+          {publishers.length > 0 && (
+            <Select value={filters.publisher} aria-label="Editora" onChange={(e) => set('publisher', e.target.value)}>
+              <option value="">Editora: todas</option>
+              {publishers.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Select>
+          )}
           <TextInput
             type="text" inputMode="search" placeholder="Autor…"
             aria-label="Filtrar por autor"

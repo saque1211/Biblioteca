@@ -1,6 +1,22 @@
 import Dexie, { type Table } from 'dexie'
 import type { Book, ScheduleEntry } from '../types'
 
+/** Converte os campos antigos loanedTo/loanDate no histórico `loans`. */
+export function normalizeBook(book: Book): Book {
+  if (book.loanedTo && !book.loans?.length) {
+    book.loans = [
+      {
+        id: `legado-${book.loanedTo}-${book.loanDate ?? ''}`,
+        name: book.loanedTo,
+        takenAt: book.loanDate ?? book.addedAt.slice(0, 10),
+      },
+    ]
+  }
+  delete book.loanedTo
+  delete book.loanDate
+  return book
+}
+
 class BibliotecaDB extends Dexie {
   books!: Table<Book, number>
   schedule!: Table<ScheduleEntry, number>
@@ -11,6 +27,12 @@ class BibliotecaDB extends Dexie {
       books: '++id, title, readingStatus, acquisitionCategory, favorite, addedAt, isbn',
       schedule: '++id, date, bookId',
     })
+    this.version(2)
+      .stores({
+        books: '++id, title, readingStatus, acquisitionCategory, favorite, addedAt, isbn',
+        schedule: '++id, date, bookId',
+      })
+      .upgrade((tx) => tx.table('books').toCollection().modify((book) => normalizeBook(book as Book)))
   }
 }
 
@@ -67,7 +89,7 @@ export async function importLibrary(data: LibraryBackup): Promise<{ books: numbe
   await db.transaction('rw', db.books, db.schedule, async () => {
     await db.books.clear()
     await db.schedule.clear()
-    await db.books.bulkAdd(data.books)
+    await db.books.bulkAdd(data.books.map(normalizeBook))
     if (Array.isArray(data.schedule)) await db.schedule.bulkAdd(data.schedule)
   })
   return { books: data.books.length, schedule: data.schedule?.length ?? 0 }

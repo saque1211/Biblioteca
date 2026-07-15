@@ -26,6 +26,10 @@ npm run preview  # serve o build
 - **Painel de detalhes**: origem/procedência, categoria de aquisição, data e valor de compra, local de compra, status de leitura, avaliação (0–5 estrelas), datas de início/término da leitura, estado de conservação, localização física, formato, idioma, empréstimo, favorito, tags livres e notas/resenha.
 - **Categoria em lote**: ative uma categoria (ex.: "Doação Sicredi") e todos os próximos livros adicionados já entram com ela — um chip fixo no topo mostra qual está ativa.
 - **Filtros**: gênero, status, categoria de aquisição, origem, avaliação, favoritos, autor, faixa de valor e formato. Ordenação por título, autor, data de aquisição, avaliação ou valor.
+- **Empréstimos**: registre para qual criança/leitor o livro foi, quando foi pego e a devolução prevista (ou sem data). Atrasos geram alerta no topo do app e notificação do sistema. Na devolução, pergunta se foi lido por completo (desativável) — alimentando as estatísticas. Histórico completo por livro.
+- **Estatísticas**: leituras e empréstimos por criança, livros mais lidos, gêneros mais lidos, composição do acervo, doadores e status.
+- **Seleção múltipla**: segure o dedo sobre um card para selecionar vários livros e aplicar configurações em comum (doador, origem, estante, tags…) ou excluir de uma vez.
+- **Tradução automática**: busca em português encontra livros catalogados pelo título em inglês (consulta traduzida via MyMemory) e títulos em outro idioma são traduzidos ao adicionar (original preservado; desativável).
 - **Agenda de leitura**: calendário mensal — clique num dia, escolha um livro, veja a capa em miniatura no dia e marque como concluído.
 - **Resumo no topo**: total de livros, lidos e valor investido.
 - **Backup**: exporte/importe a biblioteca inteira em JSON.

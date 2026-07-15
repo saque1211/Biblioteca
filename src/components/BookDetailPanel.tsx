@@ -3,6 +3,7 @@ import { deleteBook, updateBook } from '../db/db'
 import type { Book, BookCondition, BookFormat, Origin, ReadingStatus } from '../types'
 import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
 import { authorsLabel } from '../utils/format'
+import { LoanSection } from './LoanSection'
 import { Badge } from './ui/Badge'
 import { Cover } from './ui/Cover'
 import { Field, Select, TextArea, TextInput } from './ui/Field'
@@ -11,10 +12,11 @@ import { StarRating } from './ui/StarRating'
 interface BookDetailPanelProps {
   book: Book
   onClose: () => void
+  askReadOnReturn: boolean
 }
 
 /** Painel lateral de detalhes: dados bibliográficos + informações pessoais editáveis. */
-export function BookDetailPanel({ book, onClose }: BookDetailPanelProps) {
+export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPanelProps) {
   const [draft, setDraft] = useState<Book>(book)
   const [tagInput, setTagInput] = useState('')
   const [saved, setSaved] = useState(false)
@@ -69,6 +71,11 @@ export function BookDetailPanel({ book, onClose }: BookDetailPanelProps) {
             <h2 className="font-serif text-xl font-semibold leading-tight text-ink-800 dark:text-paper-100">
               {draft.title}
             </h2>
+            {draft.originalTitle && draft.originalTitle !== draft.title && (
+              <p className="mt-0.5 text-xs italic text-ink-400 dark:text-ink-500">
+                Título original: {draft.originalTitle}
+              </p>
+            )}
             <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">{authorsLabel(draft.authors)}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {draft.genre && <Badge tone="accent">{draft.genre}</Badge>}
@@ -194,14 +201,7 @@ export function BookDetailPanel({ book, onClose }: BookDetailPanelProps) {
           </div>
 
           <SectionTitle>Empréstimo</SectionTitle>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Emprestado para">
-              <TextInput placeholder="Nome da pessoa" value={draft.loanedTo ?? ''} onChange={(e) => set('loanedTo', e.target.value || undefined)} />
-            </Field>
-            <Field label="Data do empréstimo">
-              <TextInput type="date" value={draft.loanDate ?? ''} onChange={(e) => set('loanDate', e.target.value || undefined)} />
-            </Field>
-          </div>
+          <LoanSection draft={draft} onChange={(loans) => set('loans', loans)} askReadOnReturn={askReadOnReturn} />
 
           <SectionTitle>Tags personalizadas</SectionTitle>
           <div>

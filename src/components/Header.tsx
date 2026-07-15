@@ -3,15 +3,18 @@ import { exportLibrary, importLibrary, type LibraryBackup } from '../db/db'
 import type { Book } from '../types'
 import { formatCurrency } from '../utils/format'
 
+export type View = 'library' | 'calendar' | 'stats'
+
 interface HeaderProps {
   books: Book[]
-  view: 'library' | 'calendar'
-  onViewChange: (view: 'library' | 'calendar') => void
+  view: View
+  onViewChange: (view: View) => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   batchCategory: string | null
   onOpenBatchCategory: () => void
   onClearBatchCategory: () => void
+  onOpenSettings: () => void
 }
 
 export function Header({
@@ -23,6 +26,7 @@ export function Header({
   batchCategory,
   onOpenBatchCategory,
   onClearBatchCategory,
+  onOpenSettings,
 }: HeaderProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -89,7 +93,10 @@ export function Header({
               Biblioteca
             </button>
             <button type="button" className={tabClass(view === 'calendar')} onClick={() => onViewChange('calendar')}>
-              Agenda de leitura
+              Agenda
+            </button>
+            <button type="button" className={tabClass(view === 'stats')} onClick={() => onViewChange('stats')}>
+              Estatísticas
             </button>
           </nav>
 
@@ -112,6 +119,10 @@ export function Header({
                 e.target.value = ''
               }}
             />
+            <IconButton title="Configurações" onClick={onOpenSettings}>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" strokeLinejoin="round" />
+            </IconButton>
             <IconButton title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'} onClick={onToggleTheme}>
               {theme === 'dark' ? (
                 <>

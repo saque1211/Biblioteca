@@ -106,16 +106,26 @@ export async function searchOpenLibrary(query: string, signal?: AbortSignal): Pr
   return docs.map(toResult).filter((r): r is ApiBookResult => r !== null)
 }
 
+export interface OpenLibraryWork {
+  description?: string
+  genre?: string
+}
+
 /**
- * A busca da Open Library não traz sinopse; ela vive no registro do "work".
- * Chamada ao adicionar o livro, com falha silenciosa — a sinopse é opcional.
+ * A busca da Open Library não traz sinopse; ela (e assuntos extras) vivem no
+ * registro do "work". Chamada ao adicionar o livro, com falha silenciosa.
  */
-export async function fetchOpenLibraryDescription(workKey: string, signal?: AbortSignal): Promise<string | undefined> {
+export async function fetchOpenLibraryWork(workKey: string, signal?: AbortSignal): Promise<OpenLibraryWork> {
   const res = await fetch(`https://openlibrary.org${workKey}.json`, { signal })
-  if (!res.ok) return undefined
+  if (!res.ok) return {}
   const data = await res.json()
   const desc = data.description
-  if (typeof desc === 'string') return desc
-  if (desc && typeof desc.value === 'string') return desc.value
-  return undefined
+  const description =
+    typeof desc === 'string' ? desc : typeof desc?.value === 'string' ? desc.value : undefined
+  const subjects: string[] | undefined = Array.isArray(data.subjects) ? data.subjects : undefined
+  return { description, genre: pickGenre(subjects) }
+}
+
+export async function fetchOpenLibraryDescription(workKey: string, signal?: AbortSignal): Promise<string | undefined> {
+  return (await fetchOpenLibraryWork(workKey, signal)).description
 }

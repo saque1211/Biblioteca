@@ -1,5 +1,7 @@
+import { useRef } from 'react'
 import type { Book } from '../types'
 import { authorsLabel } from '../utils/format'
+import { activeLoan, isOverdue } from '../utils/loans'
 import { Badge, StatusBadge } from './ui/Badge'
 import { Cover } from './ui/Cover'
 import { StarRating } from './ui/StarRating'
@@ -7,15 +9,71 @@ import { StarRating } from './ui/StarRating'
 interface BookCardProps {
   book: Book
   onOpen: (book: Book) => void
+  selectionMode: boolean
+  selected: boolean
+  onToggleSelect: (book: Book) => void
+  onEnterSelection: (book: Book) => void
 }
 
-export function BookCard({ book, onOpen }: BookCardProps) {
+const LONG_PRESS_MS = 450
+
+export function BookCard({ book, onOpen, selectionMode, selected, onToggleSelect, onEnterSelection }: BookCardProps) {
+  const pressTimer = useRef<number | null>(null)
+  const longPressed = useRef(false)
+
+  function startPress() {
+    longPressed.current = false
+    pressTimer.current = window.setTimeout(() => {
+      longPressed.current = true
+      onEnterSelection(book)
+      if (navigator.vibrate) navigator.vibrate(30)
+    }, LONG_PRESS_MS)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current != null) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
+    }
+  }
+
+  function handleClick() {
+    if (longPressed.current) return // o toque longo já tratou este gesto
+    if (selectionMode) onToggleSelect(book)
+    else onOpen(book)
+  }
+
+  const loan = activeLoan(book)
+  const overdue = isOverdue(loan)
+
   return (
     <button
       type="button"
-      onClick={() => onOpen(book)}
-      className="group flex w-full animate-pop items-start gap-4 rounded-2xl border border-paper-200/80 bg-white p-4 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 dark:border-ink-700 dark:bg-ink-800"
+      onClick={handleClick}
+      onPointerDown={startPress}
+      onPointerUp={cancelPress}
+      onPointerLeave={cancelPress}
+      onPointerCancel={cancelPress}
+      onContextMenu={(e) => e.preventDefault()}
+      aria-pressed={selectionMode ? selected : undefined}
+      className={`group relative flex w-full animate-pop select-none items-start gap-4 rounded-2xl border bg-white p-4 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 dark:bg-ink-800 ${
+        selected
+          ? 'border-accent-500 ring-2 ring-accent-500/40'
+          : 'border-paper-200/80 dark:border-ink-700'
+      }`}
     >
+      {selectionMode && (
+        <span
+          aria-hidden
+          className={`absolute -left-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-bold shadow-sm transition-colors ${
+            selected
+              ? 'border-accent-600 bg-accent-600 text-white'
+              : 'border-paper-300 bg-white text-transparent dark:border-ink-600 dark:bg-ink-800'
+          }`}
+        >
+          ✓
+        </span>
+      )}
       <Cover
         url={book.coverUrl}
         title={book.title}
@@ -37,7 +95,8 @@ export function BookCard({ book, onOpen }: BookCardProps) {
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {book.genre && <Badge tone="accent">{book.genre}</Badge>}
           <StatusBadge status={book.readingStatus} />
-          {book.loanedTo && <Badge tone="amber">Emprestado</Badge>}
+          {loan && !overdue && <Badge tone="amber">Com {loan.name}</Badge>}
+          {overdue && <Badge tone="red">Atrasado · {loan!.name}</Badge>}
         </div>
 
         {book.rating > 0 && (

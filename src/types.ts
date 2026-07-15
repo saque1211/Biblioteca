@@ -3,10 +3,21 @@ export type BookCondition = 'novo' | 'seminovo' | 'usado' | 'danificado'
 export type BookFormat = 'capa-dura' | 'brochura' | 'ebook' | 'audiobook'
 export type Origin = 'comprado' | 'presente' | 'doacao' | 'heranca' | 'sebo' | 'outro'
 
+/** Um empréstimo (ativo ou passado) de um exemplar para uma criança/leitor. */
+export interface LoanRecord {
+  id: string
+  name: string // para quem foi emprestado
+  takenAt: string // data em que foi pego
+  dueAt?: string // data prevista de devolução (undefined = sem data definida)
+  returnedAt?: string // preenchido quando devolvido
+  completed?: boolean // true = leu por completo
+}
+
 export interface Book {
   id?: number
   // Dados bibliográficos (vindos da API ou manuais)
   title: string
+  originalTitle?: string // título original quando o exibido foi traduzido
   authors: string[]
   coverUrl?: string
   genre?: string
@@ -35,8 +46,11 @@ export interface Book {
   format?: BookFormat
   language?: string
 
-  // Empréstimo
+  // Empréstimos (o ativo é o que não tem returnedAt)
+  loans?: LoanRecord[]
+  /** @deprecated campos antigos, migrados para `loans` */
   loanedTo?: string
+  /** @deprecated */
   loanDate?: string
 
   // Pessoal
