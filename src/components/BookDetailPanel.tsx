@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { translateText } from '../api/translate'
 import { deleteBook, updateBook } from '../db/db'
-import type { Book, BookCondition, BookFormat, Origin, ReadingStatus } from '../types'
+import type { Book, BookCondition, BookFormat, LoanRecord, Origin, ReadingStatus } from '../types'
 import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
 import { authorsLabel } from '../utils/format'
 import { LoanSection } from './LoanSection'
@@ -25,9 +25,22 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
   const [translating, setTranslating] = useState(false)
   const [translateMsg, setTranslateMsg] = useState<string | null>(null)
 
+  // Recarrega o rascunho só quando OUTRO livro é aberto — atualizações de
+  // fundo (empréstimo salvo na hora, tradução) não podem apagar edições em curso
   useEffect(() => {
     setDraft(book)
-  }, [book])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book.id])
+
+  /**
+   * Empréstimos são gravados imediatamente (sem esperar "Salvar alterações"):
+   * emprestar/devolver é uma ação, não uma edição de formulário — e as
+   * estatísticas dependem desses registros.
+   */
+  function setLoansNow(loans: LoanRecord[]) {
+    setDraft((d) => ({ ...d, loans }))
+    if (book.id != null) updateBook(book.id, { loans })
+  }
 
   // Fecha com Esc
   useEffect(() => {
@@ -219,7 +232,7 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
           </div>
 
           <SectionTitle>Empréstimo</SectionTitle>
-          <LoanSection draft={draft} onChange={(loans) => set('loans', loans)} askReadOnReturn={askReadOnReturn} />
+          <LoanSection draft={draft} onChange={setLoansNow} askReadOnReturn={askReadOnReturn} />
 
           <SectionTitle>Tags personalizadas</SectionTitle>
           <div>
