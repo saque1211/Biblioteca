@@ -8,9 +8,16 @@ interface SearchBarProps {
   onSelect: (result: ApiBookResult) => Promise<void> | void
   onAddManually: (initialTitle: string) => void
   batchCategory: string | null
+  /** Começa aberta (ex.: biblioteca vazia); caso contrário fica minimizada. */
+  startExpanded?: boolean
 }
 
-export function SearchBar({ onSelect, onAddManually, batchCategory }: SearchBarProps) {
+export function SearchBar({ onSelect, onAddManually, batchCategory, startExpanded = false }: SearchBarProps) {
+  const [expanded, setExpanded] = useState(startExpanded)
+
+  useEffect(() => {
+    if (startExpanded) setExpanded(true)
+  }, [startExpanded])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ApiBookResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -95,9 +102,33 @@ export function SearchBar({ onSelect, onAddManually, batchCategory }: SearchBarP
 
   const showDropdown = open && query.trim().length >= 3
 
+  // Minimizada: só um botão discreto para abrir a busca
+  if (!expanded) {
+    return (
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-2 rounded-full border border-paper-300 bg-white px-4 py-1.5 text-xs font-medium text-ink-500 shadow-card transition-all hover:border-accent-500 hover:text-accent-600 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400 dark:hover:border-accent-500 dark:hover:text-accent-400"
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
+          </svg>
+          Buscar e adicionar livro
+        </button>
+        {justAdded && (
+          <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 animate-pop whitespace-nowrap rounded-full bg-accent-600 px-4 py-1.5 text-sm font-medium text-white shadow-card">
+            ✓ “{justAdded}” adicionado
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div ref={containerRef} className="relative mx-auto w-full max-w-2xl">
-      <div className="relative">
+    <div ref={containerRef} className="relative mx-auto flex w-full max-w-2xl items-center gap-2">
+      <div className="relative flex-1">
         <svg
           className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-400"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
@@ -108,6 +139,7 @@ export function SearchBar({ onSelect, onAddManually, batchCategory }: SearchBarP
         <input
           type="search"
           value={query}
+          autoFocus={!startExpanded}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim().length >= 3 && setOpen(true)}
           onKeyDown={onKeyDown}
@@ -121,6 +153,20 @@ export function SearchBar({ onSelect, onAddManually, batchCategory }: SearchBarP
           </div>
         )}
       </div>
+      {!startExpanded && (
+        <button
+          type="button"
+          aria-label="Fechar busca"
+          onClick={() => {
+            setQuery('')
+            setOpen(false)
+            setExpanded(false)
+          }}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-paper-200/70 hover:text-ink-600 dark:text-ink-500 dark:hover:bg-ink-700"
+        >
+          ✕
+        </button>
+      )}
 
       {justAdded && (
         <div className="absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 animate-pop whitespace-nowrap rounded-full bg-accent-600 px-4 py-1.5 text-sm font-medium text-white shadow-card">

@@ -56,31 +56,22 @@ export function ClassReadingSection({ draft, onChange }: ClassReadingSectionProp
       {active.map((reading) => (
         <div
           key={reading.id}
-          className="space-y-2.5 rounded-xl border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900/50 dark:bg-sky-900/15"
+          className="rounded-lg border border-sky-200 bg-sky-50/60 px-2 py-1.5 dark:border-sky-900/50 dark:bg-sky-900/15"
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <TextInput
               placeholder="Nome da criança"
               value={reading.name}
               onChange={(e) => update(reading.id, { name: e.target.value })}
+              className="!rounded-lg !py-1 !text-xs"
             />
-            <button
-              type="button"
-              aria-label="Remover leitura em aula"
-              onClick={() => remove(reading.id)}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-900/30"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-ink-600 dark:text-paper-300">
-            <span>Parou na página</span>
+            <span className="shrink-0 text-[11px] text-ink-500 dark:text-ink-400">pág.</span>
             <TextInput
               type="number"
               min={0}
               max={draft.pageCount || undefined}
               inputMode="numeric"
-              className="!w-24"
+              className="!w-16 shrink-0 !rounded-lg !py-1 text-center !text-xs"
               placeholder="0"
               aria-label="Página em que parou"
               value={reading.currentPage ?? ''}
@@ -88,26 +79,34 @@ export function ClassReadingSection({ draft, onChange }: ClassReadingSectionProp
                 update(reading.id, { currentPage: e.target.value === '' ? undefined : Number(e.target.value) })
               }
             />
-            {draft.pageCount ? <span className="text-xs text-ink-400 dark:text-ink-500">de {draft.pageCount}</span> : null}
-            <span className="ml-auto text-[11px] text-ink-400 dark:text-ink-500">
-              atualizado em {formatDate(reading.updatedAt)}
-            </span>
+            {draft.pageCount ? (
+              <span className="shrink-0 text-[11px] text-ink-400 dark:text-ink-500">/{draft.pageCount}</span>
+            ) : null}
+            <button
+              type="button"
+              title="Concluiu a leitura"
+              onClick={() => update(reading.id, { finishedAt: todayISO(), currentPage: draft.pageCount ?? reading.currentPage })}
+              className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-accent-600 px-2.5 text-[11px] font-semibold text-white shadow-sm transition-all hover:bg-accent-700 active:scale-[0.97]"
+            >
+              ✓ Concluiu
+            </button>
+            <button
+              type="button"
+              aria-label="Remover leitura em aula"
+              onClick={() => remove(reading.id)}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-900/30"
+            >
+              ✕
+            </button>
           </div>
           {draft.pageCount && reading.currentPage ? (
-            <div className="h-1.5 overflow-hidden rounded-full bg-sky-100 dark:bg-ink-700">
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sky-100 dark:bg-ink-700">
               <div
                 className="h-full rounded-full bg-sky-500 transition-all"
                 style={{ width: `${Math.min(100, (reading.currentPage / draft.pageCount) * 100)}%` }}
               />
             </div>
           ) : null}
-          <button
-            type="button"
-            onClick={() => update(reading.id, { finishedAt: todayISO(), currentPage: draft.pageCount ?? reading.currentPage })}
-            className="w-full rounded-xl bg-accent-600 py-2 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.98]"
-          >
-            📖 Concluiu a leitura
-          </button>
         </div>
       ))}
 

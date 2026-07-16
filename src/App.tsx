@@ -294,6 +294,7 @@ export default function App() {
               onSelect={handleAddFromApi}
               onAddManually={(title) => setManualAddTitle(title)}
               batchCategory={batchCategory}
+              startExpanded={books.length === 0}
             />
 
             {books.length === 0 ? (
