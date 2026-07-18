@@ -37,6 +37,15 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
   const [apiResults, setApiResults] = useState<ApiBookResult[]>([])
   const [adding, setAdding] = useState(false)
 
+  /** Abre a câmera (capture) ou o seletor de arquivos/galeria. */
+  function pickPhoto(source: 'camera' | 'gallery') {
+    const input = fileRef.current
+    if (!input) return
+    if (source === 'camera') input.setAttribute('capture', 'environment')
+    else input.removeAttribute('capture')
+    input.click()
+  }
+
   async function handleFile(file: File) {
     try {
       // Versão grande o suficiente para recorte + leitura nítida
@@ -101,7 +110,6 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
         ref={fileRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0]
@@ -119,10 +127,17 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
           </p>
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => pickPhoto('camera')}
             className="w-full rounded-2xl bg-accent-600 py-3.5 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.99]"
           >
             📷 Fotografar capa
+          </button>
+          <button
+            type="button"
+            onClick={() => pickPhoto('gallery')}
+            className="w-full rounded-2xl border border-paper-300 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-500 dark:border-ink-600 dark:text-paper-300"
+          >
+            🖼️ Escolher foto da galeria
           </button>
           <p className="text-[11px] text-ink-400 dark:text-ink-500">
             A leitura acontece no seu aparelho. Na primeira vez, um pacote de leitura
@@ -132,7 +147,7 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
       )}
 
       {phase === 'crop' && photoSrc && (
-        <CropImage src={photoSrc} onConfirm={handleCrop} onCancel={() => fileRef.current?.click()} />
+        <CropImage src={photoSrc} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
       )}
 
       {phase === 'reading' && (
@@ -211,7 +226,7 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
             </button>
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setPhase('pick')}
               className="w-full rounded-xl border border-paper-300 py-2 text-sm font-medium text-ink-600 transition-colors hover:border-accent-500 dark:border-ink-600 dark:text-paper-300"
             >
               📷 Tirar outra foto
@@ -242,7 +257,7 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
             )}
             <button
               type="button"
-              onClick={() => fileRef.current?.click()}
+              onClick={() => setPhase('pick')}
               className="w-full rounded-xl border border-paper-300 py-2 text-sm font-medium text-ink-600 transition-colors hover:border-accent-500 dark:border-ink-600 dark:text-paper-300"
             >
               Tentar de novo

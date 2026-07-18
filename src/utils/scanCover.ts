@@ -52,6 +52,7 @@ export async function ocrCover(
         }
       }
     }
+    console.debug('[scanner] linhas lidas:', lines.map((l) => `"${l.text}" h=${l.height} c=${Math.round(l.confidence)}`))
     return lines
   } finally {
     await worker.terminate()
@@ -80,18 +81,29 @@ function normalize(s: string): string {
 /** Palavras comuns em capas que NÃO são nome de autor. */
 const NOT_AUTHOR = /\b(editora|edicao|edição|ilustra|traducao|tradução|adaptacao|adaptação|volume|livro|colecao|coleção|serie|série|best ?seller|mais vendido|inclui|paginas|páginas|texto integral|org\.|orgs\.)\b/i
 
-function looksLikeAuthor(text: string): boolean {
+/** Remove prefixos comuns antes do nome do autor ("por Fulano", "texto de Fulana"). */
+function stripAuthorPrefix(text: string): string {
+  return text.replace(/^(texto\s+(de|por)|escrito\s+por|por|de)\s+/i, '').trim()
+}
+
+const CONNECTIVE = /^(de|da|do|das|dos|e)$/i
+
+function looksLikeAuthor(raw: string): boolean {
+  const text = stripAuthorPrefix(raw)
   if (text.length < 5 || text.length > 45) return false
   if (/\d/.test(text)) return false
   if (NOT_AUTHOR.test(text)) return false
   const words = text.split(/\s+/)
   if (words.length < 2 || words.length > 5) return false
-  // Cada palavra: só letras (com acentos), iniciando maiúscula ou toda maiúscula;
-  // conectivos de nomes (de, da, dos…) são aceitos em minúsculas
-  return words.every((w) => {
-    if (/^(de|da|do|das|dos|e)$/i.test(w)) return true
-    return /^[A-ZÀ-Ú][A-Za-zÀ-úà-ú'.-]*$/.test(w) || /^[A-ZÀ-Ú'.-]{2,}$/.test(w)
-  })
+  // Nome não começa nem termina com conectivo ("A Menina do" não é nome)
+  if (CONNECTIVE.test(words[0]) || CONNECTIVE.test(words[words.length - 1])) return false
+  const nameWords = words.filter((w) => !CONNECTIVE.test(w))
+  // Pelo menos duas palavras "de nome", com 2+ letras cada ("A" não conta)
+  if (nameWords.length < 2 || nameWords.some((w) => w.length < 2)) return false
+  // Cada palavra: só letras (com acentos), iniciando maiúscula ou toda maiúscula
+  return nameWords.every(
+    (w) => /^[A-ZÀ-Ú][A-Za-zÀ-úà-ú'.-]*$/.test(w) || /^[A-ZÀ-Ú'.-]{2,}$/.test(w),
+  )
 }
 
 /**
@@ -108,9 +120,13 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   const rawText = lines.map((l) => l.text).join('\n')
   if (usable.length === 0) return { rawText }
 
+  // Capas não têm layout padrão: o autor pode estar acima do título e em letra
+  // grande. Linhas com jeito de nome de pessoa não entram no título — a menos
+  // que TODAS as linhas grandes pareçam nome (livros cujo título é um nome).
   const maxHeight = Math.max(...usable.map((l) => l.height))
-  const titleLines = usable
-    .filter((l) => l.height >= maxHeight * 0.62)
+  const bigLines = usable.filter((l) => l.height >= maxHeight * 0.62)
+  const bigNonName = bigLines.filter((l) => !looksLikeAuthor(l.text))
+  const titleLines = (bigNonName.length > 0 ? bigNonName : bigLines)
     .sort((a, b) => a.order - b.order)
     .slice(0, 3)
   let title = titleLines.map((l) => l.text).join(' ').trim()
@@ -125,9 +141,10 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   }
 
   const titleIds = new Set(titleLines.map((l) => l.order))
-  const author = usable
+  const authorLine = usable
     .filter((l) => !titleIds.has(l.order) && looksLikeAuthor(l.text))
-    .sort((a, b) => b.height - a.height)[0]?.text
+    .sort((a, b) => b.height - a.height)[0]
+  const author = authorLine ? stripAuthorPrefix(authorLine.text) : undefined
 
   // Editora: casa apenas palavras inteiras (senão "Lê" casaria dentro de "Vale"),
   // preferindo nomes mais longos
