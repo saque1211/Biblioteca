@@ -44,7 +44,10 @@ function loadImage(dataUrl: string): Promise<HTMLImageElement> {
  * - ocr: versão para leitura — maior, em tons de cinza e com contraste
  *   reforçado (o OCR enxerga muito melhor assim)
  */
-export async function cropForScan(sourceDataUrl: string, crop: CropRect): Promise<{ cover: string; ocr: string }> {
+export async function cropForScan(
+  sourceDataUrl: string,
+  crop: CropRect,
+): Promise<{ cover: string; ocr: string; ocrPlain: string }> {
   const img = await loadImage(sourceDataUrl)
   const sx = Math.max(0, Math.round(crop.x))
   const sy = Math.max(0, Math.round(crop.y))
@@ -66,11 +69,12 @@ export async function cropForScan(sourceDataUrl: string, crop: CropRect): Promis
   const coverCanvas = draw(480)
   const cover = coverCanvas.toDataURL('image/jpeg', 0.82)
 
-  const ocrCanvas = draw(1600)
-  enhanceForOcr(ocrCanvas)
-  const ocr = ocrCanvas.toDataURL('image/jpeg', 0.92)
+  const plainCanvas = draw(1600)
+  const ocrPlain = plainCanvas.toDataURL('image/jpeg', 0.92)
+  enhanceForOcr(plainCanvas)
+  const ocr = plainCanvas.toDataURL('image/jpeg', 0.92)
 
-  return { cover, ocr }
+  return { cover, ocr, ocrPlain }
 }
 
 /** Tons de cinza + esticamento de contraste (percentis 2–98). */

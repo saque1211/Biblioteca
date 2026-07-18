@@ -79,7 +79,7 @@ function normalize(s: string): string {
 }
 
 /** Palavras comuns em capas que NÃO são nome de autor. */
-const NOT_AUTHOR = /\b(editora|edicao|edição|ilustra|traducao|tradução|adaptacao|adaptação|volume|livro|colecao|coleção|serie|série|best ?seller|mais vendido|inclui|paginas|páginas|texto integral|org\.|orgs\.)\b/i
+const NOT_AUTHOR = /\b(autora?|editora|edicao|edição|ilustra|traducao|tradução|adaptacao|adaptação|volume|livro|colecao|coleção|serie|série|best ?seller|mais vendidos?|inclui|paginas|páginas|texto integral|org\.|orgs\.|exemplares|vendid[oa]s|milh(ao|ão|oes|ões)|fenomeno|fenômeno|sucesso)\b/i
 
 /** Remove prefixos comuns antes do nome do autor ("por Fulano", "texto de Fulana"). */
 function stripAuthorPrefix(text: string): string {
@@ -112,26 +112,50 @@ function looksLikeAuthor(raw: string): boolean {
  * Tudo é palpite editável — o formulário abre preenchido para conferência.
  */
 export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
-  const usable = lines.filter((l) => {
-    if (l.confidence < 35 || l.text.length < 3) return false
+  // Fontes estilizadas de capa derrubam a "confiança" do OCR mesmo quando o
+  // texto sai quase certo — então relaxamos o corte em etapas até achar algo
+  const withLetters = lines.filter((l) => {
+    if (l.text.length < 3) return false
     const letters = (l.text.match(/[A-Za-zÀ-úà-ú]/g) ?? []).length
     return letters / l.text.length >= 0.55
   })
+  const tallest = Math.max(0, ...withLetters.map((l) => l.height))
+  // Linhas confiáveis entram sempre; linhas GRANDES (títulos) entram mesmo com
+  // confiança baixa — fontes de capa derrubam a métrica sem errar tanto o texto
+  let usable = withLetters.filter(
+    (l) => l.confidence >= 35 || (l.height >= tallest * 0.5 && l.confidence >= 8),
+  )
+  if (usable.length === 0) usable = withLetters
   const rawText = lines.map((l) => l.text).join('\n')
   if (usable.length === 0) return { rawText }
+
+  // Remove tokens meio-letra-meio-número ("do2", "4e") — lixo típico de OCR.
+  // Pontuação grudada nas bordas é descartada ("NAMORADO)" → "NAMORADO");
+  // palavras só de letras ou só de números (ex.: "1984") ficam
+  function cleanLineText(text: string): string {
+    return text
+      .split(/\s+/)
+      .map((w) => w.replace(/^[^A-Za-zÀ-úà-ú0-9]+|[^A-Za-zÀ-úà-ú0-9]+$/g, ''))
+      .filter((w) => /^[A-Za-zÀ-úà-ú'-]+$/.test(w) || /^\d+$/.test(w))
+      .join(' ')
+      .trim()
+  }
 
   // Capas não têm layout padrão: o autor pode estar acima do título e em letra
   // grande. Linhas com jeito de nome de pessoa não entram no título — a menos
   // que TODAS as linhas grandes pareçam nome (livros cujo título é um nome).
   const maxHeight = Math.max(...usable.map((l) => l.height))
-  const bigLines = usable.filter((l) => l.height >= maxHeight * 0.62)
-  const bigNonName = bigLines.filter((l) => !looksLikeAuthor(l.text))
+  // Preferência por linhas grandes e confiáveis; se nada sobrar, aceita as
+  // grandes de baixa confiança (o usuário confere no formulário)
+  let bigLines = usable.filter((l) => l.height >= maxHeight * 0.62 && l.confidence >= 45)
+  if (bigLines.length === 0) bigLines = usable.filter((l) => l.height >= maxHeight * 0.62)
+  const bigNonName = bigLines.filter((l) => !looksLikeAuthor(l.text) && !NOT_AUTHOR.test(l.text))
   const titleLines = (bigNonName.length > 0 ? bigNonName : bigLines)
     .sort((a, b) => a.order - b.order)
     .slice(0, 3)
-  let title = titleLines.map((l) => l.text).join(' ').trim()
-  if (title.length > 90) title = titleLines.slice(0, 2).map((l) => l.text).join(' ').trim()
-  if (title.length > 90) title = titleLines[0].text.trim()
+  let title = titleLines.map((l) => cleanLineText(l.text)).filter(Boolean).join(' ').trim()
+  if (title.length > 90) title = titleLines.slice(0, 2).map((l) => cleanLineText(l.text)).join(' ').trim()
+  if (title.length > 90) title = cleanLineText(titleLines[0].text)
   // Título em CAIXA ALTA vira Título Capitalizado
   if (title && title === title.toUpperCase()) {
     title = title
@@ -160,4 +184,30 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   }
 
   return { title: title || undefined, author, publisher, rawText }
+}
+
+/**
+ * Consulta de resgate para os catálogos: junta as melhores palavras lidas
+ * (maiores e mais confiáveis). A busca dos catálogos é tolerante a erros,
+ * então mesmo uma leitura imperfeita costuma achar o livro certo.
+ */
+export function buildSearchQuery(lines: OcrLine[]): string | undefined {
+  const maxHeight = Math.max(0, ...lines.map((l) => l.height))
+  const words: string[] = []
+  const seen = new Set<string>()
+  // Sem filtro de confiança: mesmo leituras "inseguras" ('MCFADDENG',
+  // 'NAMORADO)') costumam bastar para o catálogo achar o livro certo
+  for (const line of [...lines].sort((a, b) => b.height - a.height)) {
+    if (line.height < maxHeight * 0.25) continue
+    for (const raw of line.text.split(/\s+/)) {
+      const w = raw.replace(/^[^A-Za-zÀ-úà-ú]+|[^A-Za-zÀ-úà-ú]+$/g, '')
+      if (w.length < 3 || !/^[A-Za-zÀ-úà-ú'-]+$/.test(w)) continue
+      const key = w.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      words.push(w)
+      if (words.length >= 8) return words.join(' ')
+    }
+  }
+  return words.length >= 1 ? words.join(' ') : undefined
 }

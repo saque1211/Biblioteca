@@ -3,7 +3,7 @@ import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
 import { cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
-import { ocrCover, parseCoverLines, type CoverGuesses } from '../utils/scanCover'
+import { buildSearchQuery, ocrCover, parseCoverLines, type CoverGuesses } from '../utils/scanCover'
 import { Cover } from './ui/Cover'
 import { CropImage } from './ui/CropImage'
 import { Modal } from './ui/Modal'
@@ -61,22 +61,40 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
     setPhase('reading')
     setProgress(0)
     try {
-      const { cover: cropped, ocr } = await cropForScan(photoSrc, crop)
+      const { cover: cropped, ocr, ocrPlain } = await cropForScan(photoSrc, crop)
       setCover(cropped)
 
-      const lines = await ocrCover(ocr, setProgress)
-      const parsed = parseCoverLines(lines)
-      setGuesses(parsed)
-
-      // Busca nos catálogos com o que foi lido
-      if (parsed.title) {
-        try {
-          const query = [parsed.title, parsed.author].filter(Boolean).join(' ')
-          setApiResults((await searchBooks(query)).slice(0, 4))
-        } catch {
-          setApiResults([])
+      // 1ª passada: imagem realçada. Se a leitura sair fraca (fontes
+      // estilizadas às vezes leem melhor em cores), 2ª passada na original.
+      let lines = await ocrCover(ocr, (p) => setProgress(p * 0.55))
+      let parsed = parseCoverLines(lines)
+      const bestConfidence = Math.max(0, ...lines.map((l) => l.confidence))
+      if (!parsed.title || bestConfidence < 60) {
+        const lines2 = await ocrCover(ocrPlain, (p) => setProgress(0.55 + p * 0.45))
+        const parsed2 = parseCoverLines(lines2)
+        const score = (ls: typeof lines) => ls.reduce((s, l) => s + l.confidence * l.text.length, 0)
+        if ((parsed2.title && !parsed.title) || score(lines2) > score(lines)) {
+          lines = lines2
+          parsed = parsed2
         }
       }
+      setGuesses(parsed)
+
+      // Busca nos catálogos: primeiro com título+autor deduzidos; se não der
+      // resultado (ou não houver título), tenta com as melhores palavras lidas —
+      // a busca é tolerante a erros de leitura
+      let found: ApiBookResult[] = []
+      const primary = [parsed.title, parsed.author].filter(Boolean).join(' ')
+      const rescue = buildSearchQuery(lines)
+      for (const query of [primary, rescue]) {
+        if (!query || found.length > 0) continue
+        try {
+          found = (await searchBooks(query)).slice(0, 4)
+        } catch {
+          // catálogo fora do ar — segue com o caminho manual
+        }
+      }
+      setApiResults(found)
       setPhase('results')
     } catch {
       setPhase('error')
@@ -177,6 +195,16 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
               {guesses?.author && <p className="text-ink-500 dark:text-ink-400">{guesses.author}</p>}
               {guesses?.publisher && (
                 <p className="text-xs text-ink-400 dark:text-ink-500">Editora: {guesses.publisher}</p>
+              )}
+              {guesses?.rawText && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer text-[11px] text-ink-400 dark:text-ink-500">
+                    ver todo o texto lido
+                  </summary>
+                  <p className="mt-1 whitespace-pre-line text-[11px] leading-snug text-ink-400 dark:text-ink-500">
+                    {guesses.rawText}
+                  </p>
+                </details>
               )}
             </div>
           </div>
