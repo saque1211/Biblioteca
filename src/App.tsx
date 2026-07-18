@@ -10,7 +10,8 @@ import { CalendarView } from './components/CalendarView'
 import { EmptyState } from './components/EmptyState'
 import { applyFilters, DEFAULT_FILTERS, FilterBar, type Filters } from './components/FilterBar'
 import { Header, type View } from './components/Header'
-import { ManualAddModal } from './components/ManualAddModal'
+import { ManualAddModal, type ManualAddInitial } from './components/ManualAddModal'
+import { ScanCoverModal } from './components/ScanCoverModal'
 import { SearchBar } from './components/SearchBar'
 import { SettingsModal } from './components/SettingsModal'
 import { StatsView } from './components/StatsView'
@@ -31,9 +32,10 @@ export default function App() {
   const [view, setView] = useState<View>('library')
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [manualAddTitle, setManualAddTitle] = useState<string | null>(null)
+  const [manualAdd, setManualAdd] = useState<ManualAddInitial | null>(null)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
 
   // Seleção múltipla (toque longo num card)
   const [selection, setSelection] = useState<Set<number>>(new Set())
@@ -292,7 +294,8 @@ export default function App() {
           <div className="space-y-6">
             <SearchBar
               onSelect={handleAddFromApi}
-              onAddManually={(title) => setManualAddTitle(title)}
+              onAddManually={(title) => setManualAdd({ title })}
+              onScan={() => setScanOpen(true)}
               batchCategory={batchCategory}
               startExpanded={books.length === 0}
             />
@@ -351,11 +354,19 @@ export default function App() {
         />
       )}
 
-      {manualAddTitle !== null && (
+      {manualAdd !== null && (
         <ManualAddModal
-          initialTitle={manualAddTitle}
+          initial={manualAdd}
           onAdd={handleAddManually}
-          onClose={() => setManualAddTitle(null)}
+          onClose={() => setManualAdd(null)}
+        />
+      )}
+
+      {scanOpen && (
+        <ScanCoverModal
+          onAddApi={handleAddFromApi}
+          onManual={(prefill) => setManualAdd(prefill)}
+          onClose={() => setScanOpen(false)}
         />
       )}
 

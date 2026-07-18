@@ -4,22 +4,29 @@ import { CoverPicker } from './ui/CoverPicker'
 import { Field, FieldGroup, TextArea, TextInput } from './ui/Field'
 import { Modal } from './ui/Modal'
 
+export interface ManualAddInitial {
+  title?: string
+  authors?: string[]
+  publisher?: string
+  coverUrl?: string
+}
+
 interface ManualAddModalProps {
-  initialTitle: string
+  initial: ManualAddInitial
   onAdd: (data: Pick<Book, 'title' | 'authors' | 'coverUrl' | 'genre' | 'isbn' | 'publisher' | 'publishedYear' | 'pageCount' | 'synopsis'>) => Promise<void> | void
   onClose: () => void
 }
 
 /** Formulário para adicionar um livro que não apareceu na busca da API. */
-export function ManualAddModal({ initialTitle, onAdd, onClose }: ManualAddModalProps) {
-  const [title, setTitle] = useState(initialTitle)
-  const [authors, setAuthors] = useState('')
+export function ManualAddModal({ initial, onAdd, onClose }: ManualAddModalProps) {
+  const [title, setTitle] = useState(initial.title ?? '')
+  const [authors, setAuthors] = useState(initial.authors?.join(', ') ?? '')
   const [genre, setGenre] = useState('')
   const [isbn, setIsbn] = useState('')
-  const [publisher, setPublisher] = useState('')
+  const [publisher, setPublisher] = useState(initial.publisher ?? '')
   const [publishedYear, setPublishedYear] = useState('')
   const [pageCount, setPageCount] = useState('')
-  const [coverUrl, setCoverUrl] = useState('')
+  const [coverUrl, setCoverUrl] = useState(initial.coverUrl ?? '')
   const [synopsis, setSynopsis] = useState('')
 
   const [saveError, setSaveError] = useState(false)

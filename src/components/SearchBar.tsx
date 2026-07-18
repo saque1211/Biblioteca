@@ -7,12 +7,13 @@ import { Cover } from './ui/Cover'
 interface SearchBarProps {
   onSelect: (result: ApiBookResult) => Promise<void> | void
   onAddManually: (initialTitle: string) => void
+  onScan: () => void
   batchCategory: string | null
   /** Começa aberta (ex.: biblioteca vazia); caso contrário fica minimizada. */
   startExpanded?: boolean
 }
 
-export function SearchBar({ onSelect, onAddManually, batchCategory, startExpanded = false }: SearchBarProps) {
+export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, startExpanded = false }: SearchBarProps) {
   const [expanded, setExpanded] = useState(startExpanded)
 
   useEffect(() => {
@@ -102,20 +103,22 @@ export function SearchBar({ onSelect, onAddManually, batchCategory, startExpande
 
   const showDropdown = open && query.trim().length >= 3
 
-  // Minimizada: só um botão discreto para abrir a busca
+  const pillClass =
+    'flex items-center gap-2 rounded-full border border-paper-300 bg-white px-4 py-1.5 text-xs font-medium text-ink-500 shadow-card transition-all hover:border-accent-500 hover:text-accent-600 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400 dark:hover:border-accent-500 dark:hover:text-accent-400'
+
+  // Minimizada: só botões discretos para abrir a busca ou o scanner
   if (!expanded) {
     return (
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="flex items-center gap-2 rounded-full border border-paper-300 bg-white px-4 py-1.5 text-xs font-medium text-ink-500 shadow-card transition-all hover:border-accent-500 hover:text-accent-600 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400 dark:hover:border-accent-500 dark:hover:text-accent-400"
-        >
+      <div className="flex justify-center gap-2">
+        <button type="button" onClick={() => setExpanded(true)} className={pillClass}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="7" />
             <path d="M21 21l-4.3-4.3" strokeLinecap="round" />
           </svg>
           Buscar e adicionar livro
+        </button>
+        <button type="button" onClick={onScan} className={pillClass}>
+          📷 Escanear capa
         </button>
         {justAdded && (
           <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 animate-pop whitespace-nowrap rounded-full bg-accent-600 px-4 py-1.5 text-sm font-medium text-white shadow-card">
@@ -153,6 +156,18 @@ export function SearchBar({ onSelect, onAddManually, batchCategory, startExpande
           </div>
         )}
       </div>
+      <button
+        type="button"
+        title="Escanear capa com a câmera"
+        aria-label="Escanear capa com a câmera"
+        onClick={onScan}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-paper-200/70 hover:text-accent-600 dark:text-ink-500 dark:hover:bg-ink-700"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7}>
+          <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-1.8A1.5 1.5 0 0 1 10 3.5h4a1.5 1.5 0 0 1 1.3.7L16.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" strokeLinejoin="round" />
+          <circle cx="12" cy="12.5" r="3.2" />
+        </svg>
+      </button>
       {!startExpanded && (
         <button
           type="button"

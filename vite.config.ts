@@ -28,8 +28,21 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Arquivos do OCR (~7 MB) ficam fora do pré-cache: são baixados e
+        // guardados apenas quando o scanner é usado pela primeira vez
+        globIgnores: ['**/ocr/**'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         // Capas de livros: cache-first para funcionarem offline depois de vistas
         runtimeCaching: [
+          {
+            urlPattern: /\/ocr\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ocr-engine',
+              expiration: { maxEntries: 12 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/(books\.google\.com|covers\.openlibrary\.org)\/.*/,
             handler: 'CacheFirst',
