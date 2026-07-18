@@ -2,9 +2,10 @@ import { useRef, useState } from 'react'
 import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
-import { fileToCoverDataUrl } from '../utils/image'
+import { cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
 import { ocrCover, parseCoverLines, type CoverGuesses } from '../utils/scanCover'
 import { Cover } from './ui/Cover'
+import { CropImage } from './ui/CropImage'
 import { Modal } from './ui/Modal'
 
 export interface ScanManualPrefill {
@@ -20,7 +21,7 @@ interface ScanCoverModalProps {
   onClose: () => void
 }
 
-type Phase = 'pick' | 'reading' | 'results' | 'error'
+type Phase = 'pick' | 'crop' | 'reading' | 'results' | 'error'
 
 /**
  * Scanner de capa: foto → OCR no aparelho → palpites de título/autor/editora
@@ -30,23 +31,31 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
   const fileRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<Phase>('pick')
   const [progress, setProgress] = useState(0)
+  const [photoSrc, setPhotoSrc] = useState<string | null>(null)
   const [cover, setCover] = useState<string | null>(null)
   const [guesses, setGuesses] = useState<CoverGuesses | null>(null)
   const [apiResults, setApiResults] = useState<ApiBookResult[]>([])
   const [adding, setAdding] = useState(false)
 
   async function handleFile(file: File) {
+    try {
+      // Versão grande o suficiente para recorte + leitura nítida
+      setPhotoSrc(await fileToCoverDataUrl(file, 1800, 0.92))
+      setPhase('crop')
+    } catch {
+      setPhase('error')
+    }
+  }
+
+  async function handleCrop(crop: CropRect) {
+    if (!photoSrc) return
     setPhase('reading')
     setProgress(0)
     try {
-      // Versão pequena para a capa; maior (mais nítida) para o OCR
-      const [coverSmall, ocrImage] = await Promise.all([
-        fileToCoverDataUrl(file),
-        fileToCoverDataUrl(file, 1400, 0.9),
-      ])
-      setCover(coverSmall)
+      const { cover: cropped, ocr } = await cropForScan(photoSrc, crop)
+      setCover(cropped)
 
-      const lines = await ocrCover(ocrImage, setProgress)
+      const lines = await ocrCover(ocr, setProgress)
       const parsed = parseCoverLines(lines)
       setGuesses(parsed)
 
@@ -120,6 +129,10 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
             de português (~2 MB) é baixado.
           </p>
         </div>
+      )}
+
+      {phase === 'crop' && photoSrc && (
+        <CropImage src={photoSrc} onConfirm={handleCrop} onCancel={() => fileRef.current?.click()} />
       )}
 
       {phase === 'reading' && (

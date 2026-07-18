@@ -129,8 +129,14 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
     .filter((l) => !titleIds.has(l.order) && looksLikeAuthor(l.text))
     .sort((a, b) => b.height - a.height)[0]?.text
 
+  // Editora: casa apenas palavras inteiras (senão "Lê" casaria dentro de "Vale"),
+  // preferindo nomes mais longos
   const normalizedAll = normalize(rawText)
-  let publisher = PUBLISHERS.find((p) => normalizedAll.includes(normalize(p)))
+  const byLength = [...PUBLISHERS].sort((a, b) => b.length - a.length)
+  let publisher = byLength.find((p) => {
+    const escaped = normalize(p).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(normalizedAll)
+  })
   if (!publisher) {
     const m = rawText.match(/editora\s+([A-Za-zÀ-úà-ú]+(?:\s+[A-Za-zÀ-úà-ú]+)?)/i)
     if (m) publisher = m[1].trim()
