@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { exportLibrary, importLibrary, type LibraryBackup } from '../db/db'
 import type { Book } from '../types'
+import { exportBooksToXlsx, importBooksFromXlsx } from '../utils/excel'
 import { formatCurrency } from '../utils/format'
 
 export type View = 'library' | 'calendar' | 'stats'
@@ -30,12 +31,13 @@ export function Header({
 }: HeaderProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   const total = books.length
   const read = books.filter((b) => b.readingStatus === 'lido').length
   const invested = books.reduce((sum, b) => sum + (b.pricePaid ?? 0), 0)
 
-  async function handleExport() {
+  async function handleExportJson() {
     const data = await exportLibrary()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -46,17 +48,31 @@ export function Header({
     URL.revokeObjectURL(url)
   }
 
+  async function handleExportExcel() {
+    await exportBooksToXlsx(books)
+  }
+
   async function handleImportFile(file: File) {
     try {
-      const text = await file.text()
-      const data = JSON.parse(text) as LibraryBackup
-      if (total > 0 && !confirm(`Importar substituirá seus ${total} livros atuais. Continuar?`)) return
-      const { books: n } = await importLibrary(data)
-      setImportMsg(`${n} livros importados ✓`)
+      if (/\.xlsx?$/i.test(file.name)) {
+        // Planilha (formato MyLibrary): SOMA os livros à biblioteca atual
+        const { added, skipped } = await importBooksFromXlsx(file)
+        setImportMsg(
+          skipped > 0
+            ? `${added} livros importados ✓ (${skipped} já existiam)`
+            : `${added} livros importados ✓`,
+        )
+      } else {
+        const text = await file.text()
+        const data = JSON.parse(text) as LibraryBackup
+        if (total > 0 && !confirm(`Importar o backup JSON substituirá seus ${total} livros atuais. Continuar?`)) return
+        const { books: n } = await importLibrary(data)
+        setImportMsg(`${n} livros importados ✓`)
+      }
     } catch {
       setImportMsg('Arquivo inválido')
     }
-    setTimeout(() => setImportMsg(null), 3000)
+    setTimeout(() => setImportMsg(null), 5000)
   }
 
   const tabClass = (active: boolean) =>
@@ -102,16 +118,47 @@ export function Header({
 
           <div className="flex items-center gap-1.5">
             {importMsg && <span className="text-xs text-accent-600 dark:text-accent-400">{importMsg}</span>}
-            <IconButton title="Exportar biblioteca (JSON)" onClick={handleExport}>
-              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
-            </IconButton>
-            <IconButton title="Importar biblioteca (JSON)" onClick={() => fileRef.current?.click()}>
+            <div className="relative">
+              <IconButton title="Exportar biblioteca" onClick={() => setExportMenuOpen((o) => !o)}>
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+              </IconButton>
+              {exportMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setExportMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 w-56 animate-pop overflow-hidden rounded-xl border border-paper-200 bg-white py-1 shadow-panel dark:border-ink-700 dark:bg-ink-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMenuOpen(false)
+                        handleExportExcel()
+                      }}
+                      className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 transition-colors hover:bg-paper-100 dark:text-paper-100 dark:hover:bg-ink-700"
+                    >
+                      📊 Planilha Excel (.xlsx)
+                      <span className="block text-[11px] text-ink-400 dark:text-ink-500">Formato MyLibrary — abre no Excel</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMenuOpen(false)
+                        handleExportJson()
+                      }}
+                      className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 transition-colors hover:bg-paper-100 dark:text-paper-100 dark:hover:bg-ink-700"
+                    >
+                      🗂 Backup completo (.json)
+                      <span className="block text-[11px] text-ink-400 dark:text-ink-500">Tudo: empréstimos, agenda, estatísticas</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <IconButton title="Importar biblioteca (.xlsx ou .json)" onClick={() => fileRef.current?.click()}>
               <path d="M12 15V3m0 0L8 7m4-4l4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
             </IconButton>
             <input
               ref={fileRef}
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
