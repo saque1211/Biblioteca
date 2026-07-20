@@ -90,22 +90,35 @@ function stripAuthorPrefix(text: string): string {
 
 const CONNECTIVE = /^(de|da|do|das|dos|e)$/i
 
-function looksLikeAuthor(raw: string): boolean {
-  const text = stripAuthorPrefix(raw)
-  if (text.length < 5 || text.length > 45) return false
-  if (/\d/.test(text)) return false
-  if (NOT_AUTHOR.test(text)) return false
+/**
+ * Devolve o nome limpo quando o texto tem cara de nome de pessoa, ou null.
+ * `dropped` conta letras soltas descartadas (ruído de logo/OCR) — quanto
+ * menos descartes, mais confiável é o palpite.
+ */
+function asAuthorName(raw: string): { name: string; dropped: number } | null {
+  const allTokens = stripAuthorPrefix(raw).split(/\s+/)
+  const tokens = allTokens.filter((w) => w.length > 1 || CONNECTIVE.test(w))
+  const dropped = allTokens.length - tokens.length
+  const text = tokens.join(' ')
+  if (text.length < 5 || text.length > 45) return null
+  if (/\d/.test(text)) return null
+  if (NOT_AUTHOR.test(text)) return null
   const words = text.split(/\s+/)
-  if (words.length < 2 || words.length > 5) return false
+  if (words.length < 2 || words.length > 5) return null
   // Nome não começa nem termina com conectivo ("A Menina do" não é nome)
-  if (CONNECTIVE.test(words[0]) || CONNECTIVE.test(words[words.length - 1])) return false
+  if (CONNECTIVE.test(words[0]) || CONNECTIVE.test(words[words.length - 1])) return null
   const nameWords = words.filter((w) => !CONNECTIVE.test(w))
   // Pelo menos duas palavras "de nome", com 2+ letras cada ("A" não conta)
-  if (nameWords.length < 2 || nameWords.some((w) => w.length < 2)) return false
+  if (nameWords.length < 2 || nameWords.some((w) => w.length < 2)) return null
   // Cada palavra: só letras (com acentos), iniciando maiúscula ou toda maiúscula
-  return nameWords.every(
+  const ok = nameWords.every(
     (w) => /^[A-ZÀ-Ú][A-Za-zÀ-úà-ú'.-]*$/.test(w) || /^[A-ZÀ-Ú'.-]{2,}$/.test(w),
   )
+  return ok ? { name: text, dropped } : null
+}
+
+function looksLikeAuthor(raw: string): boolean {
+  return asAuthorName(raw)?.dropped === 0
 }
 
 /**
@@ -154,7 +167,23 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   // Preferência: sem nomes e sem frases de capa → sem frases de capa → tudo.
   // Frases tipo "Autora de A Empregada" só entram se não sobrar mais nada.
   const noPhrase = bigLines.filter((l) => !NOT_AUTHOR.test(l.text))
-  const bigNonName = noPhrase.filter((l) => !looksLikeAuthor(l.text))
+  // Nome de autor dividido em duas linhas grandes e vizinhas ("FREIDA" /
+  // "McFADDEN") também não deve entrar no título. Só o MELHOR par sai
+  // (menos descartes de ruído; desempate por tamanho) — excluir todos os
+  // pares possíveis esvaziaria títulos como "MCFADDEN | O NAMORADO".
+  const pairs: { orders: [number, number]; name: string; dropped: number; height: number }[] = []
+  const bigOrdered = [...noPhrase].sort((a, b) => a.order - b.order)
+  for (let i = 0; i + 1 < bigOrdered.length; i++) {
+    const a = bigOrdered[i]
+    const b = bigOrdered[i + 1]
+    const ratio = a.height / b.height
+    if (b.order - a.order !== 1 || ratio < 0.55 || ratio > 1.8) continue
+    const named = asAuthorName(`${a.text} ${b.text}`)
+    if (named) pairs.push({ orders: [a.order, b.order], ...named, height: Math.max(a.height, b.height) })
+  }
+  const bestPair = pairs.sort((p, q) => p.dropped - q.dropped || q.height - p.height)[0]
+  const pairNameOrders = new Set<number>(bestPair ? bestPair.orders : [])
+  const bigNonName = noPhrase.filter((l) => !looksLikeAuthor(l.text) && !pairNameOrders.has(l.order))
   const titleCandidates =
     bigNonName.length > 0 ? bigNonName : noPhrase.length > 0 ? noPhrase : bigLines
   const titleQuality: 'good' | 'weak' = noPhrase.length > 0 ? 'good' : 'weak'
@@ -171,10 +200,24 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   }
 
   const titleIds = new Set(titleLines.map((l) => l.order))
-  const authorLine = usable
-    .filter((l) => !titleIds.has(l.order) && looksLikeAuthor(l.text))
-    .sort((a, b) => b.height - a.height)[0]
-  const author = authorLine ? stripAuthorPrefix(authorLine.text) : undefined
+  const nonTitle = usable.filter((l) => !titleIds.has(l.order))
+  const authorCandidates: { name: string; height: number; dropped: number }[] = []
+  for (const l of nonTitle) {
+    const named = asAuthorName(l.text)
+    if (named) authorCandidates.push({ ...named, height: l.height })
+  }
+  // Nomes divididos em duas linhas ("FREIDA" em cima, "McFADDEN" embaixo):
+  // testa também pares de linhas vizinhas com tamanhos parecidos
+  const ordered = [...nonTitle].sort((a, b) => a.order - b.order)
+  for (let i = 0; i + 1 < ordered.length; i++) {
+    const a = ordered[i]
+    const b = ordered[i + 1]
+    const ratio = a.height / b.height
+    if (ratio < 0.55 || ratio > 1.8) continue
+    const named = asAuthorName(`${a.text} ${b.text}`)
+    if (named) authorCandidates.push({ ...named, height: Math.max(a.height, b.height) })
+  }
+  const author = authorCandidates.sort((x, y) => x.dropped - y.dropped || y.height - x.height)[0]?.name
 
   // Editora: casa apenas palavras inteiras (senão "Lê" casaria dentro de "Vale"),
   // preferindo nomes mais longos
