@@ -11,14 +11,25 @@ interface SearchBarProps {
   batchCategory: string | null
   /** Começa aberta (ex.: biblioteca vazia); caso contrário fica minimizada. */
   startExpanded?: boolean
+  /** Consulta vinda de fora (ex.: scanner) — abre a busca já preenchida. */
+  prefillQuery?: string | null
+  onPrefillConsumed?: () => void
 }
 
-export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, startExpanded = false }: SearchBarProps) {
+export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, startExpanded = false, prefillQuery, onPrefillConsumed }: SearchBarProps) {
   const [expanded, setExpanded] = useState(startExpanded)
 
   useEffect(() => {
     if (startExpanded) setExpanded(true)
   }, [startExpanded])
+
+  useEffect(() => {
+    if (prefillQuery == null) return
+    setExpanded(true)
+    setQuery(prefillQuery)
+    onPrefillConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillQuery])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ApiBookResult[]>([])
   const [loading, setLoading] = useState(false)

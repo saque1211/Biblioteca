@@ -18,6 +18,8 @@ export interface ScanManualPrefill {
 interface ScanCoverModalProps {
   onAddApi: (result: ApiBookResult) => Promise<void> | void
   onManual: (prefill: ScanManualPrefill) => void
+  /** Abre a busca normal com a consulta preenchida (para corrigir uma letra e achar). */
+  onSearchMore: (query: string) => void
   onClose: () => void
 }
 
@@ -27,7 +29,7 @@ type Phase = 'pick' | 'crop' | 'reading' | 'results' | 'error'
  * Scanner de capa: foto → OCR no aparelho → palpites de título/autor/editora
  * → busca nos catálogos. A foto tirada vira a capa do livro adicionado.
  */
-export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalProps) {
+export function ScanCoverModal({ onAddApi, onManual, onSearchMore, onClose }: ScanCoverModalProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<Phase>('pick')
   const [progress, setProgress] = useState(0)
@@ -90,22 +92,31 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
       }
       setGuesses(parsed)
 
-      // Busca nos catálogos: título+autor deduzidos e, se preciso, as melhores
-      // palavras das DUAS leituras. Resultados sem nenhuma palavra em comum com
-      // o texto lido são descartados (evita sugestões sem pé nem cabeça).
-      let found: ApiBookResult[] = []
+      // Busca nos catálogos com VÁRIAS consultas mescladas (título+autor, só o
+      // título, palavras das duas leituras) — uma letra errada numa consulta
+      // não derruba as outras. Resultados sem nenhuma palavra em comum com o
+      // texto lido são descartados (evita sugestões sem pé nem cabeça).
       const primary = [parsed.title, parsed.author].filter(Boolean).join(' ')
       const rescue = buildSearchQuery(allLines)
-      for (const query of [primary, rescue]) {
-        if (!query || found.length > 0) continue
+      const queries = [...new Set([primary, parsed.title, rescue].filter((q): q is string => !!q))]
+      const merged: ApiBookResult[] = []
+      const seen = new Set<string>()
+      for (const query of queries) {
+        if (merged.length >= 6) break
         try {
-          const results = await searchBooks(query)
-          found = results.filter((r) => resultMatchesReading(allLines, r)).slice(0, 4)
+          for (const r of await searchBooks(query)) {
+            if (!resultMatchesReading(allLines, r)) continue
+            const key = `${r.title.toLowerCase()}|${r.authors.join(',').toLowerCase()}`
+            if (seen.has(key)) continue
+            seen.add(key)
+            merged.push(r)
+            if (merged.length >= 6) break
+          }
         } catch {
           // catálogo fora do ar — segue com o caminho manual
         }
       }
-      setApiResults(found)
+      setApiResults(merged)
       setPhase('results')
     } catch {
       setPhase('error')
@@ -263,6 +274,18 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
             >
               {apiResults.length > 0 ? 'Nenhum destes — usar os dados lidos' : 'Usar os dados lidos (conferir e adicionar)'}
             </button>
+            {guesses?.title && (
+              <button
+                type="button"
+                onClick={() => {
+                  onSearchMore(guesses.title!)
+                  onClose()
+                }}
+                className="w-full rounded-xl border border-paper-300 py-2 text-sm font-medium text-ink-600 transition-colors hover:border-accent-500 dark:border-ink-600 dark:text-paper-300"
+              >
+                🔍 Abrir na busca para ajustar e achar o livro
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setPhase('pick')}

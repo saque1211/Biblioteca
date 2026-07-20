@@ -36,6 +36,7 @@ export default function App() {
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
+  const [searchPrefill, setSearchPrefill] = useState<string | null>(null)
 
   // Seleção múltipla (toque longo num card)
   const [selection, setSelection] = useState<Set<number>>(new Set())
@@ -298,6 +299,8 @@ export default function App() {
               onScan={() => setScanOpen(true)}
               batchCategory={batchCategory}
               startExpanded={books.length === 0}
+              prefillQuery={searchPrefill}
+              onPrefillConsumed={() => setSearchPrefill(null)}
             />
 
             {books.length === 0 ? (
@@ -366,6 +369,7 @@ export default function App() {
         <ScanCoverModal
           onAddApi={handleAddFromApi}
           onManual={(prefill) => setManualAdd(prefill)}
+          onSearchMore={(query) => setSearchPrefill(query)}
           onClose={() => setScanOpen(false)}
         />
       )}
