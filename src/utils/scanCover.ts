@@ -11,6 +11,8 @@ export interface CoverGuesses {
   title?: string
   author?: string
   publisher?: string
+  /** 'good' = título veio de linhas limpas; 'weak' = só sobrou frase de capa */
+  titleQuality?: 'good' | 'weak'
   /** Texto completo lido, para depuração/exibição */
   rawText: string
 }
@@ -155,6 +157,7 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   const bigNonName = noPhrase.filter((l) => !looksLikeAuthor(l.text))
   const titleCandidates =
     bigNonName.length > 0 ? bigNonName : noPhrase.length > 0 ? noPhrase : bigLines
+  const titleQuality: 'good' | 'weak' = noPhrase.length > 0 ? 'good' : 'weak'
   const titleLines = titleCandidates.sort((a, b) => a.order - b.order).slice(0, 3)
   let title = titleLines.map((l) => cleanLineText(l.text)).filter(Boolean).join(' ').trim()
   if (title.length > 90) title = titleLines.slice(0, 2).map((l) => cleanLineText(l.text)).join(' ').trim()
@@ -186,7 +189,35 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
     if (m) publisher = m[1].trim()
   }
 
-  return { title: title || undefined, author, publisher, rawText }
+  return { title: title || undefined, author, publisher, titleQuality: title ? titleQuality : undefined, rawText }
+}
+
+function normalizeWord(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
+
+/**
+ * O catálogo às vezes devolve algo sem relação quando a consulta sai
+ * embaralhada — só mostramos resultados que compartilham ao menos uma
+ * palavra significativa (4+ letras) com o texto lido da capa.
+ */
+export function resultMatchesReading(
+  lines: OcrLine[],
+  result: { title: string; authors: string[] },
+): boolean {
+  const readWords = new Set<string>()
+  for (const line of lines) {
+    for (const raw of line.text.split(/\s+/)) {
+      const w = normalizeWord(raw.replace(/^[^A-Za-zÀ-úà-ú]+|[^A-Za-zÀ-úà-ú]+$/g, ''))
+      if (w.length >= 4) readWords.add(w)
+    }
+  }
+  if (readWords.size === 0) return true // nada legível — não dá para julgar
+  const haystack = normalizeWord(`${result.title} ${result.authors.join(' ')}`)
+  for (const w of readWords) {
+    if (haystack.includes(w)) return true
+  }
+  return false
 }
 
 /**

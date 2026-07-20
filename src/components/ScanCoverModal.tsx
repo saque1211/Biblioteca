@@ -3,7 +3,7 @@ import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
 import { autoDetectCrop, cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
-import { buildSearchQuery, ocrCover, parseCoverLines, type CoverGuesses } from '../utils/scanCover'
+import { buildSearchQuery, ocrCover, parseCoverLines, resultMatchesReading, type CoverGuesses } from '../utils/scanCover'
 import { Cover } from './ui/Cover'
 import { CropImage } from './ui/CropImage'
 import { Modal } from './ui/Modal'
@@ -69,32 +69,38 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
       const { cover: cropped, ocr, ocrPlain } = await cropForScan(photoSrc, crop)
       setCover(cropped)
 
-      // 1ª passada: imagem realçada. Se a leitura sair fraca (fontes
-      // estilizadas às vezes leem melhor em cores), 2ª passada na original.
-      let lines = await ocrCover(ocr, (p) => setProgress(p * 0.55))
-      let parsed = parseCoverLines(lines)
-      const bestConfidence = Math.max(0, ...lines.map((l) => l.confidence))
-      if (!parsed.title || bestConfidence < 60) {
+      // 1ª passada: imagem realçada. A 2ª (imagem original) roda sempre que o
+      // título não veio limpo — títulos estilizados às vezes só saem numa delas.
+      const lines1 = await ocrCover(ocr, (p) => setProgress(p * 0.55))
+      const parsed1 = parseCoverLines(lines1)
+      const conf1 = Math.max(0, ...lines1.map((l) => l.confidence))
+      let lines = lines1
+      let parsed = parsed1
+      let allLines = lines1
+      if (parsed1.titleQuality !== 'good' || conf1 < 60) {
         const lines2 = await ocrCover(ocrPlain, (p) => setProgress(0.55 + p * 0.45))
         const parsed2 = parseCoverLines(lines2)
+        allLines = [...lines1, ...lines2]
+        const rank = (p: CoverGuesses) => (p.titleQuality === 'good' ? 2 : p.title ? 1 : 0)
         const score = (ls: typeof lines) => ls.reduce((s, l) => s + l.confidence * l.text.length, 0)
-        if ((parsed2.title && !parsed.title) || score(lines2) > score(lines)) {
+        if (rank(parsed2) > rank(parsed1) || (rank(parsed2) === rank(parsed1) && score(lines2) > score(lines1))) {
           lines = lines2
           parsed = parsed2
         }
       }
       setGuesses(parsed)
 
-      // Busca nos catálogos: primeiro com título+autor deduzidos; se não der
-      // resultado (ou não houver título), tenta com as melhores palavras lidas —
-      // a busca é tolerante a erros de leitura
+      // Busca nos catálogos: título+autor deduzidos e, se preciso, as melhores
+      // palavras das DUAS leituras. Resultados sem nenhuma palavra em comum com
+      // o texto lido são descartados (evita sugestões sem pé nem cabeça).
       let found: ApiBookResult[] = []
       const primary = [parsed.title, parsed.author].filter(Boolean).join(' ')
-      const rescue = buildSearchQuery(lines)
+      const rescue = buildSearchQuery(allLines)
       for (const query of [primary, rescue]) {
         if (!query || found.length > 0) continue
         try {
-          found = (await searchBooks(query)).slice(0, 4)
+          const results = await searchBooks(query)
+          found = results.filter((r) => resultMatchesReading(allLines, r)).slice(0, 4)
         } catch {
           // catálogo fora do ar — segue com o caminho manual
         }
