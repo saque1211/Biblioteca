@@ -217,7 +217,27 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
     const named = asAuthorName(`${a.text} ${b.text}`)
     if (named) authorCandidates.push({ ...named, height: Math.max(a.height, b.height) })
   }
-  const author = authorCandidates.sort((x, y) => x.dropped - y.dropped || y.height - x.height)[0]?.name
+  let author = authorCandidates.sort((x, y) => x.dropped - y.dropped || y.height - x.height)[0]?.name
+
+  // Último recurso: uma única palavra grande com cara de sobrenome
+  // ("McFADQEN" quando o primeiro nome não foi lido) — melhor um palpite
+  // editável do que campo vazio
+  if (!author && title) {
+    const titleNorm = normalize(title)
+    // Considera todas as linhas com letras (mesmo confiança 0) — o formato
+    // exigido da palavra já corta o ruído
+    author = withLetters
+      .filter((l) => !titleIds.has(l.order))
+      .map((l) => ({ line: l, word: cleanLineText(l.text) }))
+      .filter(({ line, word }) => {
+        if (line.height < maxHeight * 0.2) return false
+        if (!/^[A-Za-zÀ-úà-ú'.-]{5,20}$/.test(word)) return false
+        if (!/^[A-ZÀ-Ú]/.test(word)) return false
+        if (NOT_AUTHOR.test(word)) return false
+        return !titleNorm.includes(normalize(word))
+      })
+      .sort((a, b) => b.line.height - a.line.height)[0]?.word
+  }
 
   // Editora: casa apenas palavras inteiras (senão "Lê" casaria dentro de "Vale"),
   // preferindo nomes mais longos
