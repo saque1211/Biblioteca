@@ -77,6 +77,83 @@ export async function cropForScan(
   return { cover, ocr, ocrPlain }
 }
 
+/**
+ * Detecção automática do livro na foto: procura a região retangular com
+ * bordas/contraste (o livro) contra o fundo mais uniforme (mesa, cama…).
+ * Melhor esforço — devolve null quando não encontra nada plausível, e o
+ * recorte manual continua disponível para ajuste fino.
+ */
+export async function autoDetectCrop(sourceDataUrl: string): Promise<CropRect | null> {
+  const img = await loadImage(sourceDataUrl)
+  const maxDim = 240
+  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight))
+  const w = Math.max(8, Math.round(img.naturalWidth * scale))
+  const h = Math.max(8, Math.round(img.naturalHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(img, 0, 0, w, h)
+  const data = ctx.getImageData(0, 0, w, h).data
+
+  // Luminância + magnitude de gradiente (bordas)
+  const lum = new Float32Array(w * h)
+  for (let i = 0; i < w * h; i++) {
+    lum[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2]
+  }
+  const colSum = new Float32Array(w)
+  const rowSum = new Float32Array(h)
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const g =
+        Math.abs(lum[y * w + x + 1] - lum[y * w + x - 1]) +
+        Math.abs(lum[(y + 1) * w + x] - lum[(y - 1) * w + x])
+      if (g > 24) {
+        colSum[x] += g
+        rowSum[y] += g
+      }
+    }
+  }
+
+  function bounds(sums: Float32Array): [number, number] | null {
+    const max = Math.max(...sums)
+    if (max <= 0) return null
+    const threshold = max * 0.12
+    let start = -1
+    let end = -1
+    for (let i = 0; i < sums.length; i++) {
+      if (sums[i] >= threshold) {
+        if (start === -1) start = i
+        end = i
+      }
+    }
+    return start === -1 ? null : [start, end]
+  }
+
+  const cols = bounds(colSum)
+  const rows = bounds(rowSum)
+  if (!cols || !rows) return null
+
+  // Margem de 2% e volta às coordenadas originais
+  const mx = w * 0.02
+  const my = h * 0.02
+  const x0 = Math.max(0, cols[0] - mx)
+  const y0 = Math.max(0, rows[0] - my)
+  const x1 = Math.min(w, cols[1] + mx)
+  const y1 = Math.min(h, rows[1] + my)
+  const bw = x1 - x0
+  const bh = y1 - y0
+
+  // Sanidade: precisa parecer um livro (nem minúsculo, nem proporção absurda)
+  const areaFraction = (bw * bh) / (w * h)
+  const aspect = bw / bh
+  if (areaFraction < 0.12 || aspect < 0.3 || aspect > 1.6) return null
+
+  const factor = 1 / scale
+  return { x: x0 * factor, y: y0 * factor, width: bw * factor, height: bh * factor }
+}
+
 /** Tons de cinza + esticamento de contraste (percentis 2–98). */
 function enhanceForOcr(canvas: HTMLCanvasElement): void {
   const ctx = canvas.getContext('2d')!

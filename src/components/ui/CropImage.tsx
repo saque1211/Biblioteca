@@ -3,6 +3,8 @@ import type { CropRect } from '../../utils/image'
 
 interface CropImageProps {
   src: string
+  /** Recorte inicial em coordenadas naturais da imagem (ex.: detecção automática). */
+  initialRect?: CropRect | null
   onConfirm: (crop: CropRect) => void
   onCancel: () => void
 }
@@ -15,7 +17,7 @@ const MIN_SIZE = 48 // px exibidos
  * Ajuste de recorte com toque: arraste os cantos para marcar só a capa
  * (o recorte vira a capa do livro e é o que o leitor de texto analisa).
  */
-export function CropImage({ src, onConfirm, onCancel }: CropImageProps) {
+export function CropImage({ src, initialRect, onConfirm, onCancel }: CropImageProps) {
   const imgRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [rect, setRect] = useState<CropRect | null>(null)
@@ -26,7 +28,18 @@ export function CropImage({ src, onConfirm, onCancel }: CropImageProps) {
     if (!img) return
     const w = img.clientWidth
     const h = img.clientHeight
-    // Começa com uma margem de 6% de cada lado
+    if (initialRect) {
+      // Recorte detectado automaticamente (coordenadas naturais → exibidas)
+      const factor = w / img.naturalWidth
+      setRect({
+        x: Math.max(0, initialRect.x * factor),
+        y: Math.max(0, initialRect.y * factor),
+        width: Math.min(w, initialRect.width * factor),
+        height: Math.min(h, initialRect.height * factor),
+      })
+      return
+    }
+    // Sem detecção: margem de 6% de cada lado
     setRect({ x: w * 0.06, y: h * 0.06, width: w * 0.88, height: h * 0.88 })
   }
 
@@ -95,8 +108,10 @@ export function CropImage({ src, onConfirm, onCancel }: CropImageProps) {
   return (
     <div className="space-y-3">
       <p className="text-center text-xs text-ink-500 dark:text-ink-400">
-        Arraste os cantos para marcar <strong>só a capa</strong> — isso vira a capa do
-        livro e melhora muito a leitura do texto.
+        {initialRect
+          ? 'Recorte automático aplicado — ajuste os cantos se precisar.'
+          : 'Arraste os cantos para marcar só a capa.'}{' '}
+        O recorte vira a capa do livro e melhora a leitura do texto.
       </p>
       <div
         ref={containerRef}

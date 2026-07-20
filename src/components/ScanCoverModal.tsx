@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
-import { cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
+import { autoDetectCrop, cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
 import { buildSearchQuery, ocrCover, parseCoverLines, type CoverGuesses } from '../utils/scanCover'
 import { Cover } from './ui/Cover'
 import { CropImage } from './ui/CropImage'
@@ -46,10 +46,15 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
     input.click()
   }
 
+  const [autoRect, setAutoRect] = useState<CropRect | null>(null)
+
   async function handleFile(file: File) {
     try {
       // Versão grande o suficiente para recorte + leitura nítida
-      setPhotoSrc(await fileToCoverDataUrl(file, 1800, 0.92))
+      const src = await fileToCoverDataUrl(file, 1800, 0.92)
+      setPhotoSrc(src)
+      // Detecção automática das bordas do livro (melhor esforço)
+      setAutoRect(await autoDetectCrop(src).catch(() => null))
       setPhase('crop')
     } catch {
       setPhase('error')
@@ -165,7 +170,7 @@ export function ScanCoverModal({ onAddApi, onManual, onClose }: ScanCoverModalPr
       )}
 
       {phase === 'crop' && photoSrc && (
-        <CropImage src={photoSrc} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
+        <CropImage src={photoSrc} initialRect={autoRect} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
       )}
 
       {phase === 'reading' && (

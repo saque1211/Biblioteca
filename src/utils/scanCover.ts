@@ -149,10 +149,13 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
   // grandes de baixa confiança (o usuário confere no formulário)
   let bigLines = usable.filter((l) => l.height >= maxHeight * 0.62 && l.confidence >= 45)
   if (bigLines.length === 0) bigLines = usable.filter((l) => l.height >= maxHeight * 0.62)
-  const bigNonName = bigLines.filter((l) => !looksLikeAuthor(l.text) && !NOT_AUTHOR.test(l.text))
-  const titleLines = (bigNonName.length > 0 ? bigNonName : bigLines)
-    .sort((a, b) => a.order - b.order)
-    .slice(0, 3)
+  // Preferência: sem nomes e sem frases de capa → sem frases de capa → tudo.
+  // Frases tipo "Autora de A Empregada" só entram se não sobrar mais nada.
+  const noPhrase = bigLines.filter((l) => !NOT_AUTHOR.test(l.text))
+  const bigNonName = noPhrase.filter((l) => !looksLikeAuthor(l.text))
+  const titleCandidates =
+    bigNonName.length > 0 ? bigNonName : noPhrase.length > 0 ? noPhrase : bigLines
+  const titleLines = titleCandidates.sort((a, b) => a.order - b.order).slice(0, 3)
   let title = titleLines.map((l) => cleanLineText(l.text)).filter(Boolean).join(' ').trim()
   if (title.length > 90) title = titleLines.slice(0, 2).map((l) => cleanLineText(l.text)).join(' ').trim()
   if (title.length > 90) title = cleanLineText(titleLines[0].text)
@@ -192,12 +195,16 @@ export function parseCoverLines(lines: OcrLine[]): CoverGuesses {
  * então mesmo uma leitura imperfeita costuma achar o livro certo.
  */
 export function buildSearchQuery(lines: OcrLine[]): string | undefined {
-  const maxHeight = Math.max(0, ...lines.map((l) => l.height))
+  // Frases de capa ("Autora de…", "mais vendidos") poluem a busca — só entram
+  // se não houver mais nada legível
+  const preferred = lines.filter((l) => !NOT_AUTHOR.test(l.text))
+  const pool = preferred.length >= 1 ? preferred : lines
+  const maxHeight = Math.max(0, ...pool.map((l) => l.height))
   const words: string[] = []
   const seen = new Set<string>()
   // Sem filtro de confiança: mesmo leituras "inseguras" ('MCFADDENG',
   // 'NAMORADO)') costumam bastar para o catálogo achar o livro certo
-  for (const line of [...lines].sort((a, b) => b.height - a.height)) {
+  for (const line of [...pool].sort((a, b) => b.height - a.height)) {
     if (line.height < maxHeight * 0.25) continue
     for (const raw of line.text.split(/\s+/)) {
       const w = raw.replace(/^[^A-Za-zÀ-úà-ú]+|[^A-Za-zÀ-úà-ú]+$/g, '')
