@@ -134,8 +134,9 @@ export async function importBooksFromXlsx(file: File): Promise<ExcelImportSummar
         readingEnd,
         notes: cell(row, cComments) || undefined,
         synopsis: cell(row, cSummary) || undefined,
-        // Caminhos locais de outro app não são acessíveis; só URLs valem
-        coverUrl: /^https?:\/\//.test(coverPath) ? coverPath : undefined,
+        // Aceita URLs http(s) e fotos embutidas (data:) do próprio app;
+        // caminhos locais de outro app (/MyLibrary/...) não são acessíveis
+        coverUrl: /^(https?:\/\/|data:image\/)/.test(coverPath) ? coverPath : undefined,
         tags,
         rating: 0,
         favorite: false,
@@ -148,6 +149,9 @@ export async function importBooksFromXlsx(file: File): Promise<ExcelImportSummar
   return { added: toAdd.length, skipped: totalRows - toAdd.length }
 }
 
+// Limite de caracteres por célula do Excel; deixamos folga
+const MAX_CELL = 32000
+
 /** Exporta a biblioteca em .xlsx no mesmo formato de colunas do MyLibrary. */
 export async function exportBooksToXlsx(books: Book[]): Promise<void> {
   const XLSX = await import('xlsx')
@@ -155,6 +159,12 @@ export async function exportBooksToXlsx(books: Book[]): Promise<void> {
     const period =
       b.readingStart || b.readingEnd
         ? `${isoToBrDate(b.readingStart)} - ${isoToBrDate(b.readingEnd)}`
+        : ''
+    // Preserva a capa: URL http(s) ou a foto embutida (data:) do app, desde
+    // que caiba na célula — assim as fotos sobrevivem ao ciclo exportar/importar
+    const cover =
+      b.coverUrl && (b.coverUrl.startsWith('http') || b.coverUrl.startsWith('data:')) && b.coverUrl.length <= MAX_CELL
+        ? b.coverUrl
         : ''
     return [
       b.title,
@@ -169,7 +179,7 @@ export async function exportBooksToXlsx(books: Book[]): Promise<void> {
       period,
       b.notes ?? '',
       b.synopsis ?? '',
-      b.coverUrl?.startsWith('http') ? b.coverUrl : '',
+      cover,
     ]
   })
   const sheet = XLSX.utils.aoa_to_sheet([[...HEADERS], ...rows])
