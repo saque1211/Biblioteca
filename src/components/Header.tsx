@@ -3,6 +3,7 @@ import { exportLibrary, importLibrary, type LibraryBackup } from '../db/db'
 import type { Book } from '../types'
 import { exportBooksToXlsx, importBooksFromXlsx } from '../utils/excel'
 import { formatCurrency } from '../utils/format'
+import { Modal } from './ui/Modal'
 
 export type View = 'library' | 'calendar' | 'stats'
 
@@ -118,40 +119,9 @@ export function Header({
 
           <div className="flex items-center gap-1.5">
             {importMsg && <span className="text-xs text-accent-600 dark:text-accent-400">{importMsg}</span>}
-            <div className="relative">
-              <IconButton title="Exportar biblioteca" onClick={() => setExportMenuOpen((o) => !o)}>
-                <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
-              </IconButton>
-              {exportMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setExportMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-40 mt-1 w-56 animate-pop overflow-hidden rounded-xl border border-paper-200 bg-white py-1 shadow-panel dark:border-ink-700 dark:bg-ink-800">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExportMenuOpen(false)
-                        handleExportExcel()
-                      }}
-                      className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 transition-colors hover:bg-paper-100 dark:text-paper-100 dark:hover:bg-ink-700"
-                    >
-                      📊 Planilha Excel (.xlsx)
-                      <span className="block text-[11px] text-ink-400 dark:text-ink-500">Formato MyLibrary — abre no Excel</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExportMenuOpen(false)
-                        handleExportJson()
-                      }}
-                      className="block w-full px-4 py-2.5 text-left text-sm text-ink-700 transition-colors hover:bg-paper-100 dark:text-paper-100 dark:hover:bg-ink-700"
-                    >
-                      🗂 Backup completo (.json)
-                      <span className="block text-[11px] text-ink-400 dark:text-ink-500">Tudo: empréstimos, agenda, estatísticas</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <IconButton title="Exportar biblioteca" onClick={() => setExportMenuOpen(true)}>
+              <path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+            </IconButton>
             <IconButton title="Importar biblioteca (.xlsx ou .json)" onClick={() => fileRef.current?.click()}>
               <path d="M12 15V3m0 0L8 7m4-4l4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
             </IconButton>
@@ -210,6 +180,39 @@ export function Header({
           )}
         </div>
       </div>
+
+      {exportMenuOpen && (
+        <Modal title="Exportar biblioteca" onClose={() => setExportMenuOpen(false)} maxWidth="max-w-sm">
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setExportMenuOpen(false)
+                handleExportExcel()
+              }}
+              className="w-full rounded-xl border border-paper-200 p-3.5 text-left transition-colors hover:border-accent-500 hover:bg-paper-100 dark:border-ink-700 dark:hover:bg-ink-700"
+            >
+              <span className="block text-sm font-semibold text-ink-800 dark:text-paper-100">📊 Planilha Excel (.xlsx)</span>
+              <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">
+                Lista de livros com capas — abre no Excel e pode ser reimportada
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setExportMenuOpen(false)
+                handleExportJson()
+              }}
+              className="w-full rounded-xl border border-paper-200 p-3.5 text-left transition-colors hover:border-accent-500 hover:bg-paper-100 dark:border-ink-700 dark:hover:bg-ink-700"
+            >
+              <span className="block text-sm font-semibold text-ink-800 dark:text-paper-100">🗂 Backup completo (.json)</span>
+              <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">
+                Recomendado — guarda tudo: empréstimos, agenda, estatísticas e fotos
+              </span>
+            </button>
+          </div>
+        </Modal>
+      )}
     </header>
   )
 }
