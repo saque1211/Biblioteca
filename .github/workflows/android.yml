@@ -11,22 +11,26 @@ jobs:
       - name: Baixar projeto
         uses: actions/checkout@v4
 
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Instalar Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Instalar Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Instalar dependências
         run: |
           npm install
 
-      - name: Gerar Android
+      - name: Instalar Capacitor
+        run: |
+          npm install @capacitor/cli @capacitor/core
+
+      - name: Sincronizar Android
         run: |
           npx cap sync android
 
@@ -36,7 +40,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Salvar APK
+      - name: Enviar APK
         uses: actions/upload-artifact@v4
         with:
           name: Biblioteca-APK
