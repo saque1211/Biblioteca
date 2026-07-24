@@ -52,10 +52,11 @@ jobs:
 
       - name: Corrigir Kotlin duplicado
         run: |
-          echo "kotlin.stdlib.default.dependency=false" >> android/gradle.properties
-
-      - name: Gerar APK
-        run: |
+          echo "configurations.all {" >> android/app/build.gradle
+          echo "    configurations.all {" >> android/app/build.gradle
+          echo "        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'" >> android/app/build.gradle
+          echo "    }" >> android/app/build.gradle
+          echo "}" >> android/app/build.gradle
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
