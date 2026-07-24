@@ -8,6 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Baixar projeto
         uses: actions/checkout@v4
 
@@ -20,7 +21,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
       - name: Instalar dependências
         run: |
@@ -32,9 +33,9 @@ jobs:
 
       - name: Criar configuração Capacitor
         run: |
-          npx cap init Biblioteca com.exemplo.biblioteca --web-dir=dist
+          npx cap init Biblioteca com.biblioteca.app --web-dir=dist
 
-      - name: Gerar arquivos web
+      - name: Criar arquivos web
         run: |
           npm run build
 
@@ -45,6 +46,11 @@ jobs:
       - name: Sincronizar Android
         run: |
           npx cap sync android
+
+      - name: Verificar Java
+        run: |
+          java -version
+          javac -version
 
       - name: Gerar APK
         run: |
