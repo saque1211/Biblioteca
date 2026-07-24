@@ -1,0 +1,37 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.saque.biblioteca'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.saque.biblioteca"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(findProperty('KEYSTORE_FILE') ?: 'release.keystore')
+            storePassword findProperty('KEYSTORE_PASSWORD') ?: 'biblioteca'
+            keyAlias findProperty('KEY_ALIAS') ?: 'biblioteca'
+            keyPassword findProperty('KEY_PASSWORD') ?: 'biblioteca'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
