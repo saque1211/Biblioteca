@@ -28,7 +28,11 @@ jobs:
 
       - name: Instalar Capacitor
         run: |
-          npm install @capacitor/cli @capacitor/core
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Criar configuração Capacitor
+        run: |
+          npx cap init Biblioteca com.exemplo.biblioteca --web-dir=dist
 
       - name: Adicionar Android
         run: |
