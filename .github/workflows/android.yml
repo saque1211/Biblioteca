@@ -38,11 +38,17 @@ jobs:
       - name: Copiar arquivos
         run: npx cap copy
 
-      - name: Configurar Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
+- name: Configurar Java 21
+  uses: actions/setup-java@v4
+  with:
+    distribution: temurin
+    java-version: '21'
+    cache: gradle
+
+- name: Verificar Java
+  run: |
+    java -version
+    javac -version
 
       - name: Gerar APK
         run: |
