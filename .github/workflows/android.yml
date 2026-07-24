@@ -30,6 +30,10 @@ jobs:
         run: |
           npm install @capacitor/cli @capacitor/core
 
+      - name: Adicionar Android
+        run: |
+          npx cap add android
+
       - name: Sincronizar Android
         run: |
           npx cap sync android
