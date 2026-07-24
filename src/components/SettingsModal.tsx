@@ -6,9 +6,10 @@ interface SettingsModalProps {
   settings: AppSettings
   onUpdate: (changes: Partial<AppSettings>) => void
   onClose: () => void
+  onChangeProfile: () => void
 }
 
-export function SettingsModal({ settings, onUpdate, onClose }: SettingsModalProps) {
+export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: SettingsModalProps) {
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
   )
@@ -24,6 +25,25 @@ export function SettingsModal({ settings, onUpdate, onClose }: SettingsModalProp
   return (
     <Modal title="Configurações" onClose={onClose}>
       <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-paper-200 p-3 dark:border-ink-700">
+          <span>
+            <span className="block text-sm font-medium text-ink-700 dark:text-paper-100">Tipo de conta</span>
+            <span className="mt-0.5 block text-xs text-ink-500 dark:text-ink-400">
+              {settings.profile === 'corporativo'
+                ? '🏫 Escolar / Corporativa'
+                : settings.profile === 'pessoal'
+                ? '📖 Pessoal'
+                : 'Não definido'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onChangeProfile}
+            className="shrink-0 rounded-xl border border-paper-300 px-4 py-1.5 text-xs font-semibold text-ink-600 transition-colors hover:border-accent-500 hover:text-accent-600 dark:border-ink-600 dark:text-paper-300"
+          >
+            Trocar
+          </button>
+        </div>
         <SettingRow
           title="Perguntar se leu por completo"
           description="Ao marcar um livro como devolvido, perguntar se a criança apenas devolveu ou leu por completo (alimenta as estatísticas de leitura)."

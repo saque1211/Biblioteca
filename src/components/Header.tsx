@@ -17,6 +17,8 @@ interface HeaderProps {
   onOpenBatchCategory: () => void
   onClearBatchCategory: () => void
   onOpenSettings: () => void
+  showInvested: boolean
+  showBatchCategory: boolean
 }
 
 export function Header({
@@ -29,6 +31,8 @@ export function Header({
   onOpenBatchCategory,
   onClearBatchCategory,
   onOpenSettings,
+  showInvested,
+  showBatchCategory,
 }: HeaderProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -100,7 +104,7 @@ export function Header({
               </h1>
               <p className="text-xs text-ink-500 dark:text-ink-400">
                 {total} {total === 1 ? 'livro' : 'livros'} · {read} {read === 1 ? 'lido' : 'lidos'}
-                {invested > 0 && <> · {formatCurrency(invested)} investidos</>}
+                {showInvested && invested > 0 && <> · {formatCurrency(invested)} investidos</>}
               </p>
             </div>
           </div>
@@ -153,7 +157,8 @@ export function Header({
           </div>
         </div>
 
-        {/* Chip da categoria em lote ativa */}
+        {/* Chip da categoria em lote ativa (só no perfil escolar/corporativo) */}
+        {showBatchCategory && (
         <div className="mt-3 flex justify-center">
           {batchCategory ? (
             <div className="flex animate-pop items-center gap-2 rounded-full border border-accent-200 bg-accent-100 py-1.5 pl-4 pr-2 text-sm text-accent-700 shadow-card dark:border-accent-700/50 dark:bg-accent-700/25 dark:text-accent-200">
@@ -179,6 +184,7 @@ export function Header({
             </button>
           )}
         </div>
+        )}
       </div>
 
       {exportMenuOpen && (

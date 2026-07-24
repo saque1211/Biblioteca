@@ -11,13 +11,14 @@ import { EmptyState } from './components/EmptyState'
 import { applyFilters, DEFAULT_FILTERS, FilterBar, type Filters } from './components/FilterBar'
 import { Header, type View } from './components/Header'
 import { ManualAddModal, type ManualAddInitial } from './components/ManualAddModal'
+import { ProfileModal } from './components/ProfileModal'
 import { ScanCoverModal } from './components/ScanCoverModal'
 import { SearchBar } from './components/SearchBar'
 import { SettingsModal } from './components/SettingsModal'
 import { StatsView } from './components/StatsView'
 import { addBook, db, deleteBook, ensureDbOpen, updateBook, type DbStatus } from './db/db'
 import { useBatchCategory } from './hooks/useBatchCategory'
-import { useSettings } from './hooks/useSettings'
+import { profileFlags, useSettings } from './hooks/useSettings'
 import { useTheme } from './hooks/useTheme'
 import type { ApiBookResult, Book } from './types'
 import { formatDate, todayISO } from './utils/format'
@@ -36,6 +37,9 @@ export default function App() {
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+
+  const flags = profileFlags(settings.profile)
   const [searchPrefill, setSearchPrefill] = useState<string | null>(null)
 
   // Seleção múltipla (toque longo num card)
@@ -211,6 +215,8 @@ export default function App() {
         onOpenBatchCategory={() => setBatchModalOpen(true)}
         onClearBatchCategory={() => setBatchCategory(null)}
         onOpenSettings={() => setSettingsOpen(true)}
+        showInvested={flags.invested}
+        showBatchCategory={flags.batchCategory}
       />
 
       {/* Alerta de devoluções atrasadas */}
@@ -342,7 +348,7 @@ export default function App() {
           </div>
         )}
         {view === 'calendar' && <CalendarView books={books} />}
-        {view === 'stats' && <StatsView books={books} />}
+        {view === 'stats' && <StatsView books={books} showChildStats={flags.childStats} showInvested={flags.invested} />}
       </main>
 
       <footer className="pb-8 text-center text-xs text-ink-400 dark:text-ink-500">
@@ -354,6 +360,7 @@ export default function App() {
           book={selectedBook}
           onClose={() => setSelectedId(null)}
           askReadOnReturn={settings.askReadOnReturn}
+          showClassReading={flags.classReading}
         />
       )}
 
@@ -384,7 +391,28 @@ export default function App() {
       )}
 
       {settingsOpen && (
-        <SettingsModal settings={settings} onUpdate={updateSettings} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={() => setSettingsOpen(false)}
+          onChangeProfile={() => {
+            setSettingsOpen(false)
+            setProfileModalOpen(true)
+          }}
+        />
+      )}
+
+      {/* Escolha do perfil: obrigatória na primeira vez, ou aberta pelas configurações */}
+      {(settings.profile === undefined || profileModalOpen) && (
+        <ProfileModal
+          current={settings.profile}
+          mandatory={settings.profile === undefined}
+          onChoose={(profile) => {
+            updateSettings({ profile })
+            setProfileModalOpen(false)
+          }}
+          onClose={() => setProfileModalOpen(false)}
+        />
       )}
 
       {bulkEditOpen && (

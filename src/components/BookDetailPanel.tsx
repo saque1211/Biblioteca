@@ -16,10 +16,11 @@ interface BookDetailPanelProps {
   book: Book
   onClose: () => void
   askReadOnReturn: boolean
+  showClassReading: boolean
 }
 
 /** Painel lateral de detalhes: dados bibliográficos + informações pessoais editáveis. */
-export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPanelProps) {
+export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReading }: BookDetailPanelProps) {
   const [draft, setDraft] = useState<Book>(book)
   const [tagInput, setTagInput] = useState('')
   const [saved, setSaved] = useState(false)
@@ -238,8 +239,12 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn }: BookDetailPa
             </div>
           </div>
 
-          <SectionTitle>Leitura em aula</SectionTitle>
-          <ClassReadingSection draft={draft} onChange={setClassReadingsNow} />
+          {showClassReading && (
+            <>
+              <SectionTitle>Leitura em aula</SectionTitle>
+              <ClassReadingSection draft={draft} onChange={setClassReadingsNow} />
+            </>
+          )}
 
           <SectionTitle>Empréstimo</SectionTitle>
           <LoanSection draft={draft} onChange={setLoansNow} askReadOnReturn={askReadOnReturn} />

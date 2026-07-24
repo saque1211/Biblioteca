@@ -7,6 +7,10 @@ import { Cover } from './ui/Cover'
 
 interface StatsViewProps {
   books: Book[]
+  /** Mostrar estatísticas por criança (perfil escolar/corporativo). */
+  showChildStats: boolean
+  /** Mostrar valor investido na coleção (perfil pessoal). */
+  showInvested: boolean
 }
 
 interface Ranked {
@@ -21,7 +25,7 @@ function rank(map: Map<string, Ranked>): Ranked[] {
 }
 
 /** Estatísticas da biblioteca: leitores, livros e gêneros mais lidos, acervo. */
-export function StatsView({ books }: StatsViewProps) {
+export function StatsView({ books, showChildStats, showInvested }: StatsViewProps) {
   const stats = useMemo(() => {
     const readers = new Map<string, Ranked>()
     const borrowers = new Map<string, Ranked>()
@@ -120,23 +124,41 @@ export function StatsView({ books }: StatsViewProps) {
     )
   }
 
+  const readCount = stats.statusCount['lido'] ?? 0
+
   return (
     <div className="animate-slide-up space-y-6">
       {/* Cartões de resumo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SummaryCard value={stats.totalBooks} label="livros no acervo" />
-        <SummaryCard value={stats.completedLoans} label="leituras completas" highlight={stats.inClassCount > 0 ? `${stats.inClassCount} lendo em aula` : undefined} highlightTone="info" />
-        <SummaryCard value={stats.activeCount} label="emprestados agora" highlight={stats.overdueCount > 0 ? `${stats.overdueCount} em atraso` : undefined} />
-        <SummaryCard value={formatCurrency(stats.invested)} label="investidos no acervo" small />
+        {showChildStats ? (
+          <>
+            <SummaryCard value={stats.completedLoans} label="leituras completas" highlight={stats.inClassCount > 0 ? `${stats.inClassCount} lendo em aula` : undefined} highlightTone="info" />
+            <SummaryCard value={stats.activeCount} label="emprestados agora" highlight={stats.overdueCount > 0 ? `${stats.overdueCount} em atraso` : undefined} />
+          </>
+        ) : (
+          <>
+            <SummaryCard value={readCount} label="livros lidos" />
+            <SummaryCard value={stats.favorites} label="favoritos" />
+          </>
+        )}
+        {showInvested && <SummaryCard value={formatCurrency(stats.invested)} label="investidos no acervo" small />}
+        {!showInvested && showChildStats && (
+          <SummaryCard value={stats.favorites} label="favoritos" />
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <RankCard title="📚 Leituras por criança" subtitle="livros lidos por completo" items={stats.readers} unit="livro(s)" empty="Nenhuma leitura completa registrada ainda — marque “Leu por completo” ao receber uma devolução." />
-        <RankCard title="🤝 Empréstimos por criança" subtitle="total de vezes que pegou livros" items={stats.borrowers} unit="empréstimo(s)" empty="Nenhum empréstimo registrado ainda." />
-        <RankCard title="⭐ Livros mais lidos" subtitle="pelas devoluções com leitura completa" items={stats.mostRead} unit="leitura(s)" withCovers empty="Ainda sem leituras completas." />
-        <RankCard title="🏷️ Gêneros mais lidos" subtitle="das leituras completas" items={stats.genresRead} unit="leitura(s)" empty="Ainda sem leituras completas." />
+        {showChildStats && (
+          <>
+            <RankCard title="📚 Leituras por criança" subtitle="livros lidos por completo" items={stats.readers} unit="livro(s)" empty="Nenhuma leitura completa registrada ainda — marque “Leu por completo” ao receber uma devolução." />
+            <RankCard title="🤝 Empréstimos por criança" subtitle="total de vezes que pegou livros" items={stats.borrowers} unit="empréstimo(s)" empty="Nenhum empréstimo registrado ainda." />
+            <RankCard title="⭐ Livros mais lidos" subtitle="pelas devoluções com leitura completa" items={stats.mostRead} unit="leitura(s)" withCovers empty="Ainda sem leituras completas." />
+            <RankCard title="🏷️ Gêneros mais lidos" subtitle="das leituras completas" items={stats.genresRead} unit="leitura(s)" empty="Ainda sem leituras completas." />
+          </>
+        )}
         <RankCard title="📖 Gêneros do acervo" subtitle="composição da biblioteca" items={stats.genresOwned} unit="livro(s)" empty="Nenhum gênero cadastrado." />
-        <RankCard title="💚 Doadores / origem" subtitle="por categoria de aquisição" items={stats.donors} unit="livro(s)" empty="Nenhum doador/categoria cadastrado." />
+        <RankCard title={showChildStats ? '💚 Doadores / origem' : '🏷️ Categorias'} subtitle="por categoria de aquisição" items={stats.donors} unit="livro(s)" empty="Nenhuma categoria cadastrada." />
       </div>
 
       {/* Status de leitura do acervo */}
@@ -149,7 +171,7 @@ export function StatsView({ books }: StatsViewProps) {
             </span>
           ))}
           <span>Favoritos: <strong>{stats.favorites}</strong></span>
-          <span>Total de empréstimos: <strong>{stats.totalLoans}</strong></span>
+          {showChildStats && <span>Total de empréstimos: <strong>{stats.totalLoans}</strong></span>}
         </div>
       </div>
     </div>
