@@ -50,13 +50,13 @@ jobs:
           java -version
           javac -version
 
-      - name: Corrigir Kotlin duplicado
+            - name: Verificar Java
         run: |
-          echo "configurations.all {" >> android/app/build.gradle
-          echo "    configurations.all {" >> android/app/build.gradle
-          echo "        resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'" >> android/app/build.gradle
-          echo "    }" >> android/app/build.gradle
-          echo "}" >> android/app/build.gradle
+          java -version
+          javac -version
+
+      - name: Gerar APK
+        run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
