@@ -50,7 +50,7 @@ jobs:
           java -version
           javac -version
 
-            - name: Verificar Java
+      - name: Verificar Java
         run: |
           java -version
           javac -version
