@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { exportLibrary, importLibrary, type LibraryBackup } from '../db/db'
 import type { Book } from '../types'
+import { downloadFile } from '../utils/download'
 import { exportBooksToXlsx, importBooksFromXlsx } from '../utils/excel'
 import { formatCurrency } from '../utils/format'
 import { Modal } from './ui/Modal'
@@ -44,13 +45,11 @@ export function Header({
 
   async function handleExportJson() {
     const data = await exportLibrary()
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `biblioteca-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+    await downloadFile(
+      `biblioteca-backup-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(data, null, 2),
+      'application/json',
+    )
   }
 
   async function handleExportExcel() {

@@ -1,5 +1,6 @@
 import { db } from '../db/db'
 import type { Book } from '../types'
+import { downloadFile } from './download'
 
 /**
  * Importa/exporta planilhas .xlsx no formato do app MyLibrary
@@ -185,5 +186,10 @@ export async function exportBooksToXlsx(books: Book[]): Promise<void> {
   const sheet = XLSX.utils.aoa_to_sheet([[...HEADERS], ...rows])
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, 'Livros')
-  XLSX.writeFile(workbook, `biblioteca-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  // Gera os bytes e usa o download unificado (funciona no navegador e no app)
+  const out = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+  const blob = new Blob([out], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  await downloadFile(`biblioteca-${new Date().toISOString().slice(0, 10)}.xlsx`, blob, blob.type)
 }
