@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AppSettings } from '../hooks/useSettings'
+import { clearLibrary, countDuplicateBooks, removeDuplicateBooks } from '../db/db'
 import { Modal } from './ui/Modal'
 
 interface SettingsModalProps {
@@ -13,6 +14,8 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
   const [notifPermission, setNotifPermission] = useState(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
   )
+  const [maintMsg, setMaintMsg] = useState<string | null>(null)
+  const [working, setWorking] = useState(false)
 
   async function toggleNotifications(enabled: boolean) {
     if (enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -20,6 +23,33 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
       setNotifPermission(result)
     }
     onUpdate({ overdueNotifications: enabled })
+  }
+
+  async function handleRemoveDuplicates() {
+    if (working) return
+    setWorking(true)
+    setMaintMsg(null)
+    const dups = await countDuplicateBooks()
+    if (dups === 0) {
+      setMaintMsg('Nenhum livro duplicado encontrado ✓')
+      setWorking(false)
+      return
+    }
+    if (confirm(`Foram encontrados ${dups} livro(s) duplicado(s) (mesmo ISBN ou título+autor). Remover as cópias, mantendo uma de cada?`)) {
+      const removed = await removeDuplicateBooks()
+      setMaintMsg(`${removed} duplicado(s) removido(s) ✓`)
+    }
+    setWorking(false)
+  }
+
+  async function handleClearLibrary() {
+    if (working) return
+    if (!confirm('Isto vai APAGAR TODA a biblioteca (livros, empréstimos e agenda). Essa ação não pode ser desfeita. Deseja continuar?')) return
+    if (!confirm('Tem certeza? Recomendamos exportar um backup antes. Apagar tudo agora?')) return
+    setWorking(true)
+    await clearLibrary()
+    setMaintMsg('Biblioteca apagada.')
+    setWorking(false)
   }
 
   return (
@@ -68,6 +98,40 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
           checked={settings.translateTitles}
           onChange={(v) => onUpdate({ translateTitles: v })}
         />
+
+        {/* Manutenção da biblioteca */}
+        <div className="space-y-2 border-t border-paper-200 pt-4 dark:border-ink-700">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
+            Manutenção
+          </p>
+          <button
+            type="button"
+            disabled={working}
+            onClick={handleRemoveDuplicates}
+            className="w-full rounded-xl border border-paper-300 px-4 py-2.5 text-left text-sm font-medium text-ink-700 transition-colors hover:border-accent-500 hover:bg-paper-100 disabled:opacity-50 dark:border-ink-600 dark:text-paper-100 dark:hover:bg-ink-700"
+          >
+            🧹 Remover livros duplicados
+            <span className="mt-0.5 block text-[11px] font-normal text-ink-500 dark:text-ink-400">
+              Mantém uma cópia de cada (mesmo ISBN ou título + autor)
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={working}
+            onClick={handleClearLibrary}
+            className="w-full rounded-xl border border-rose-300 px-4 py-2.5 text-left text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-900/30"
+          >
+            🗑 Apagar toda a biblioteca
+            <span className="mt-0.5 block text-[11px] font-normal text-rose-500/80 dark:text-rose-300/70">
+              Remove todos os livros e dados — não pode ser desfeito
+            </span>
+          </button>
+          {maintMsg && (
+            <p className="animate-fade-in rounded-lg bg-paper-100 px-3 py-2 text-xs text-ink-600 dark:bg-ink-700 dark:text-paper-200">
+              {maintMsg}
+            </p>
+          )}
+        </div>
       </div>
       <p className="mt-5 text-center text-[11px] text-ink-400 dark:text-ink-500">
         O aviso de atraso é verificado quando o app é aberto.
