@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { AppSettings } from '../hooks/useSettings'
 import { clearLibrary, countDuplicateBooks, removeDuplicateBooks } from '../db/db'
+import { countBooksWithoutCover, fetchMissingCovers, type CoverFetchProgress } from '../utils/fetchCovers'
 import { Modal } from './ui/Modal'
 
 interface SettingsModalProps {
@@ -16,6 +17,8 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
   )
   const [maintMsg, setMaintMsg] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const [coverProgress, setCoverProgress] = useState<CoverFetchProgress | null>(null)
+  const coverAbort = useRef<AbortController | null>(null)
 
   async function toggleNotifications(enabled: boolean) {
     if (enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -40,6 +43,46 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
       setMaintMsg(`${removed} duplicado(s) removido(s) ✓`)
     }
     setWorking(false)
+  }
+
+  async function handleFetchCovers() {
+    if (working) return
+    setWorking(true)
+    setMaintMsg(null)
+    const missing = await countBooksWithoutCover()
+    if (missing === 0) {
+      setMaintMsg('Todos os livros já têm capa ✓')
+      setWorking(false)
+      return
+    }
+    if (
+      !confirm(
+        `${missing} livro(s) estão sem capa. Buscar as capas na internet agora? Isso pode levar alguns minutos — mantenha o app aberto.`,
+      )
+    ) {
+      setWorking(false)
+      return
+    }
+    const controller = new AbortController()
+    coverAbort.current = controller
+    setCoverProgress({ done: 0, total: missing, found: 0 })
+    try {
+      const result = await fetchMissingCovers((p) => setCoverProgress(p), controller.signal)
+      setMaintMsg(
+        controller.signal.aborted
+          ? `Busca interrompida — ${result.found} capa(s) encontrada(s).`
+          : `${result.found} capa(s) encontrada(s) de ${result.total} livro(s) sem imagem ✓`,
+      )
+    } catch {
+      setMaintMsg('Não foi possível concluir a busca de capas.')
+    }
+    setCoverProgress(null)
+    coverAbort.current = null
+    setWorking(false)
+  }
+
+  function handleCancelCovers() {
+    coverAbort.current?.abort()
   }
 
   async function handleClearLibrary() {
@@ -104,6 +147,39 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
             Manutenção
           </p>
+          <button
+            type="button"
+            disabled={working}
+            onClick={handleFetchCovers}
+            className="w-full rounded-xl border border-paper-300 px-4 py-2.5 text-left text-sm font-medium text-ink-700 transition-colors hover:border-accent-500 hover:bg-paper-100 disabled:opacity-50 dark:border-ink-600 dark:text-paper-100 dark:hover:bg-ink-700"
+          >
+            🖼 Buscar capas faltantes
+            <span className="mt-0.5 block text-[11px] font-normal text-ink-500 dark:text-ink-400">
+              Procura na internet (por ISBN ou título) as capas dos livros importados sem imagem
+            </span>
+          </button>
+          {coverProgress && (
+            <div className="animate-fade-in space-y-1.5 rounded-xl bg-paper-100 px-3 py-2.5 dark:bg-ink-700">
+              <div className="flex items-center justify-between text-xs text-ink-600 dark:text-paper-200">
+                <span>
+                  Buscando capas… {coverProgress.done}/{coverProgress.total} · {coverProgress.found} encontrada(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelCovers}
+                  className="font-semibold text-rose-600 hover:underline dark:text-rose-300"
+                >
+                  Parar
+                </button>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-paper-300 dark:bg-ink-600">
+                <div
+                  className="h-full rounded-full bg-accent-600 transition-[width] duration-300"
+                  style={{ width: `${coverProgress.total ? (coverProgress.done / coverProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
           <button
             type="button"
             disabled={working}
