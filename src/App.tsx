@@ -351,7 +351,21 @@ export default function App() {
           </div>
         )}
         {view === 'calendar' && <CalendarView books={books} />}
-        {view === 'stats' && <StatsView books={books} showChildStats={flags.childStats} showInvested={flags.invested} />}
+        {view === 'stats' && (
+          <StatsView
+            books={books}
+            showChildStats={flags.childStats}
+            showInvested={flags.invested}
+            onOpenFiltered={(partial) => {
+              setFilters({ ...DEFAULT_FILTERS, ...partial })
+              setView('library')
+            }}
+            onOpenBook={(id) => {
+              setView('library')
+              setSelectedId(id)
+            }}
+          />
+        )}
       </main>
 
       <footer className="pb-8 text-center text-xs text-ink-400 dark:text-ink-500">

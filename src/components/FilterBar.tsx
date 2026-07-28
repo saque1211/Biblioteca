@@ -8,6 +8,9 @@ export type SortKey = 'title' | 'author' | 'acquisitionDate' | 'rating' | 'price
 
 export type LoanFilter = '' | 'emprestado' | 'atrasado' | 'disponivel' | 'em-aula'
 
+/** Lido nos últimos N meses (pela data de término da leitura). */
+export type ReadWithin = '' | '1' | '3' | '6' | '12'
+
 export interface Filters {
   text: string
   genre: string
@@ -21,6 +24,7 @@ export interface Filters {
   priceMax: string
   format: '' | BookFormat
   loan: LoanFilter
+  readWithin: ReadWithin
   language: string
   tag: string
   condition: '' | BookCondition
@@ -42,6 +46,7 @@ export const DEFAULT_FILTERS: Filters = {
   priceMax: '',
   format: '',
   loan: '',
+  readWithin: '',
   language: '',
   tag: '',
   condition: '',
@@ -50,11 +55,19 @@ export const DEFAULT_FILTERS: Filters = {
   sortAsc: false,
 }
 
+/** Data de N meses atrás (para "lido nos últimos N meses"). */
+export function monthsAgo(months: number): Date {
+  const d = new Date()
+  d.setMonth(d.getMonth() - months)
+  return d
+}
+
 export function applyFilters(books: Book[], f: Filters): Book[] {
   const text = f.text.trim().toLowerCase()
   const author = f.author.trim().toLowerCase()
   const min = f.priceMin === '' ? -Infinity : Number(f.priceMin)
   const max = f.priceMax === '' ? Infinity : Number(f.priceMax)
+  const readCutoff = f.readWithin ? monthsAgo(Number(f.readWithin)) : null
 
   const filtered = books.filter((b) => {
     if (text && !`${b.title} ${b.authors.join(' ')} ${b.isbn ?? ''}`.toLowerCase().includes(text)) return false
@@ -76,6 +89,11 @@ export function applyFilters(books: Book[], f: Filters): Book[] {
       if (f.loan === 'disponivel' && loan) return false
       if (f.loan === 'atrasado' && !isOverdue(loan)) return false
       if (f.loan === 'em-aula' && !(b.classReadings ?? []).some((r) => !r.finishedAt)) return false
+    }
+    if (readCutoff) {
+      // Lido no período: usa a data de término da leitura
+      const end = b.readingEnd ? new Date(b.readingEnd) : null
+      if (!end || Number.isNaN(end.getTime()) || end < readCutoff) return false
     }
     if (f.language && (b.language ?? '').toLowerCase() !== f.language.toLowerCase()) return false
     if (f.tag && !b.tags.includes(f.tag)) return false
@@ -141,7 +159,7 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
   const activeCount = [
     filters.genre, filters.status, filters.acquisitionCategory, filters.origin,
     filters.author, filters.priceMin, filters.priceMax, filters.format,
-    filters.loan, filters.language, filters.tag, filters.condition, filters.publisher,
+    filters.loan, filters.readWithin, filters.language, filters.tag, filters.condition, filters.publisher,
     filters.minRating > 0 ? 'r' : '', filters.favoritesOnly ? 'f' : '',
   ].filter(Boolean).length
 
@@ -208,6 +226,13 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
             <option value="atrasado">Devolução atrasada</option>
             <option value="em-aula">Em leitura em aula</option>
             <option value="disponivel">Disponíveis</option>
+          </Select>
+          <Select value={filters.readWithin} aria-label="Lido no período" onChange={(e) => set('readWithin', e.target.value as ReadWithin)}>
+            <option value="">Lido em: qualquer data</option>
+            <option value="1">Lido no último mês</option>
+            <option value="3">Lido nos últimos 3 meses</option>
+            <option value="6">Lido nos últimos 6 meses</option>
+            <option value="12">Lido nos últimos 12 meses</option>
           </Select>
           <Select value={filters.origin} aria-label="Origem" onChange={(e) => set('origin', e.target.value as Filters['origin'])}>
             <option value="">Origem: todas</option>
