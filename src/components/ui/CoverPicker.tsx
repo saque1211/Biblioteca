@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { fileToCoverDataUrl } from '../../utils/image'
+import { CoverScanModal } from '../CoverScanModal'
 import { Cover } from './Cover'
 import { TextInput } from './Field'
 
@@ -17,6 +18,7 @@ export function CoverPicker({ value, title, onChange }: CoverPickerProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [scanOpen, setScanOpen] = useState(false)
   const isPhoto = value?.startsWith('data:')
 
   async function handleFile(file: File) {
@@ -38,11 +40,19 @@ export function CoverPicker({ value, title, onChange }: CoverPickerProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={() => setScanOpen(true)}
+            disabled={processing}
+            className="rounded-xl border border-paper-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-500 hover:text-accent-600 disabled:opacity-50 dark:border-ink-600 dark:text-paper-300 dark:hover:border-accent-500"
+          >
+            🔍 Escanear capa
+          </button>
+          <button
+            type="button"
             onClick={() => fileRef.current?.click()}
             disabled={processing}
             className="rounded-xl border border-paper-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-500 hover:text-accent-600 disabled:opacity-50 dark:border-ink-600 dark:text-paper-300 dark:hover:border-accent-500"
           >
-            {processing ? 'Processando…' : '📷 Tirar foto / escolher imagem'}
+            {processing ? 'Processando…' : '📷 Foto / imagem'}
           </button>
           {value && (
             <button
@@ -76,6 +86,9 @@ export function CoverPicker({ value, title, onChange }: CoverPickerProps) {
         )}
         {error && <p className="text-xs text-rose-500">{error}</p>}
       </div>
+      {scanOpen && (
+        <CoverScanModal onCapture={(cover) => onChange(cover)} onClose={() => setScanOpen(false)} />
+      )}
     </div>
   )
 }

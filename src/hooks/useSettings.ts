@@ -12,6 +12,10 @@ export interface AppSettings {
   overdueNotifications: boolean
   /** Traduzir automaticamente o título de livros adicionados em outro idioma. */
   translateTitles: boolean
+  /** Chave PIX para receber doações (opcional; configurada pelo dono). */
+  pixKey?: string
+  /** Recado que aparece na tela de doações (opcional). */
+  donationNote?: string
 }
 
 const DEFAULTS: AppSettings = {

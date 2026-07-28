@@ -7,6 +7,7 @@ import { BookCard } from './components/BookCard'
 import { BookDetailPanel } from './components/BookDetailPanel'
 import { BulkEditModal } from './components/BulkEditModal'
 import { CalendarView } from './components/CalendarView'
+import { DonationModal } from './components/DonationModal'
 import { EmptyState } from './components/EmptyState'
 import { applyFilters, DEFAULT_FILTERS, FilterBar, type Filters } from './components/FilterBar'
 import { Header, type View } from './components/Header'
@@ -36,6 +37,7 @@ export default function App() {
   const [manualAdd, setManualAdd] = useState<ManualAddInitial | null>(null)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [donationsOpen, setDonationsOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
 
@@ -215,6 +217,7 @@ export default function App() {
         onOpenBatchCategory={() => setBatchModalOpen(true)}
         onClearBatchCategory={() => setBatchCategory(null)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenDonations={() => setDonationsOpen(true)}
         showInvested={flags.invested}
         showBatchCategory={flags.batchCategory}
       />
@@ -387,6 +390,14 @@ export default function App() {
           current={batchCategory}
           onSet={setBatchCategory}
           onClose={() => setBatchModalOpen(false)}
+        />
+      )}
+
+      {donationsOpen && (
+        <DonationModal
+          settings={settings}
+          onUpdate={updateSettings}
+          onClose={() => setDonationsOpen(false)}
         />
       )}
 
