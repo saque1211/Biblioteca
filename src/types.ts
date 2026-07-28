@@ -67,6 +67,8 @@ export interface Book {
 
   // Pessoal
   favorite: boolean
+  /** Lista de desejos: livro que quero comprar/ler. */
+  wishlist?: boolean
   tags: string[]
   notes?: string
 

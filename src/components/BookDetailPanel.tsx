@@ -4,6 +4,7 @@ import { deleteBook, updateBook } from '../db/db'
 import type { Book, BookCondition, BookFormat, ClassReading, LoanRecord, Origin, ReadingStatus } from '../types'
 import { CONDITION_LABELS, FORMAT_LABELS, ORIGIN_LABELS, READING_STATUS_LABELS } from '../types'
 import { authorsLabel } from '../utils/format'
+import { amazonSearchUrl, mercadoLivreSearchUrl } from '../utils/storeLinks'
 import { ClassReadingSection } from './ClassReadingSection'
 import { LoanSection } from './LoanSection'
 import { Badge } from './ui/Badge'
@@ -17,10 +18,12 @@ interface BookDetailPanelProps {
   onClose: () => void
   askReadOnReturn: boolean
   showClassReading: boolean
+  /** Código de afiliado da Amazon (opcional) para os links de compra. */
+  amazonTag?: string
 }
 
 /** Painel lateral de detalhes: dados bibliográficos + informações pessoais editáveis. */
-export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReading }: BookDetailPanelProps) {
+export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReading, amazonTag }: BookDetailPanelProps) {
   const [draft, setDraft] = useState<Book>(book)
   const [tagInput, setTagInput] = useState('')
   const [saved, setSaved] = useState(false)
@@ -135,6 +138,18 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReadi
                   <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                 </svg>
               </button>
+              <button
+                type="button"
+                onClick={() => set('wishlist', !draft.wishlist)}
+                title={draft.wishlist ? 'Remover da lista de desejos' : 'Adicionar à lista de desejos'}
+                className={`flex h-8 w-8 items-center justify-center rounded-full transition-all hover:scale-110 ${
+                  draft.wishlist ? 'text-accent-600 dark:text-accent-400' : 'text-ink-400 hover:text-accent-500'
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill={draft.wishlist ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={1.6}>
+                  <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1z" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
           </div>
           <button
@@ -159,6 +174,32 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReadi
               </p>
             </details>
           )}
+
+          {/* Onde comprar (lista de desejos / recompra) — links de busca */}
+          <div>
+            <SectionTitle>{draft.wishlist ? '🔖 Na lista de desejos · onde comprar' : 'Onde comprar'}</SectionTitle>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href={amazonSearchUrl(draft, amazonTag)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-xl border border-paper-300 py-2.5 text-center text-sm font-medium text-ink-700 transition-colors hover:border-accent-500 hover:bg-paper-100 dark:border-ink-600 dark:text-paper-100 dark:hover:bg-ink-700"
+              >
+                🛒 Ver na Amazon
+              </a>
+              <a
+                href={mercadoLivreSearchUrl(draft)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-xl border border-paper-300 py-2.5 text-center text-sm font-medium text-ink-700 transition-colors hover:border-accent-500 hover:bg-paper-100 dark:border-ink-600 dark:text-paper-100 dark:hover:bg-ink-700"
+              >
+                🛒 Ver no Mercado Livre
+              </a>
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink-400 dark:text-ink-500">
+              Abre a busca da loja com o preço atual.
+            </p>
+          </div>
 
           <SectionTitle>Leitura</SectionTitle>
           <div className="grid grid-cols-2 gap-3">

@@ -85,11 +85,18 @@ export function BookCard({ book, onOpen, selectionMode, selected, onToggleSelect
           <h3 className="line-clamp-2 font-serif text-[15px] font-semibold leading-snug text-ink-800 dark:text-paper-100">
             {book.title}
           </h3>
-          {book.favorite && (
-            <span className="shrink-0 text-rose-400" title="Favorito" aria-label="Favorito">
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            </span>
-          )}
+          <span className="flex shrink-0 items-center gap-1">
+            {book.wishlist && (
+              <span className="text-accent-600 dark:text-accent-400" title="Lista de desejos" aria-label="Lista de desejos">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1z"/></svg>
+              </span>
+            )}
+            {book.favorite && (
+              <span className="text-rose-400" title="Favorito" aria-label="Favorito">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              </span>
+            )}
+          </span>
         </div>
         <p className="mt-0.5 truncate text-xs text-ink-500 dark:text-ink-400">{authorsLabel(book.authors)}</p>
 

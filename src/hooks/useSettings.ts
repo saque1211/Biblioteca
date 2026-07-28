@@ -16,6 +16,8 @@ export interface AppSettings {
   pixKey?: string
   /** Recado que aparece na tela de doações (opcional). */
   donationNote?: string
+  /** Código de afiliado da Amazon (opcional) — comissão nos links de compra. */
+  amazonTag?: string
 }
 
 const DEFAULTS: AppSettings = {

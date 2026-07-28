@@ -19,6 +19,7 @@ export interface Filters {
   origin: '' | Origin
   minRating: number
   favoritesOnly: boolean
+  wishlistOnly: boolean
   author: string
   priceMin: string
   priceMax: string
@@ -43,6 +44,7 @@ export const DEFAULT_FILTERS: Filters = {
   origin: '',
   minRating: 0,
   favoritesOnly: false,
+  wishlistOnly: false,
   author: '',
   priceMin: '',
   priceMax: '',
@@ -80,6 +82,7 @@ export function applyFilters(books: Book[], f: Filters): Book[] {
     if (f.origin && b.origin !== f.origin) return false
     if (f.minRating > 0 && b.rating < f.minRating) return false
     if (f.favoritesOnly && !b.favorite) return false
+    if (f.wishlistOnly && !b.wishlist) return false
     if (author && !b.authors.join(' ').toLowerCase().includes(author)) return false
     if (f.priceMin !== '' || f.priceMax !== '') {
       const price = b.pricePaid ?? 0
@@ -167,7 +170,7 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
     filters.genre, filters.status, filters.acquisitionCategory, filters.origin,
     filters.author, filters.priceMin, filters.priceMax, filters.format,
     filters.loan, filters.readWithin, filters.readMonth, filters.language, filters.tag, filters.condition, filters.publisher,
-    filters.minRating > 0 ? 'r' : '', filters.favoritesOnly ? 'f' : '',
+    filters.minRating > 0 ? 'r' : '', filters.favoritesOnly ? 'f' : '', filters.wishlistOnly ? 'w' : '',
   ].filter(Boolean).length
 
   return (
@@ -301,6 +304,15 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
               className="h-4 w-4 accent-[var(--color-accent-600)]"
             />
             Só favoritos
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-paper-300 px-3 py-2 text-sm text-ink-600 dark:border-ink-600 dark:text-paper-300">
+            <input
+              type="checkbox"
+              checked={filters.wishlistOnly}
+              onChange={(e) => set('wishlistOnly', e.target.checked)}
+              className="h-4 w-4 accent-[var(--color-accent-600)]"
+            />
+            🔖 Lista de desejos
           </label>
           {activeCount > 0 && (
             <button
