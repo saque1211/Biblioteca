@@ -19,18 +19,6 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
   const [working, setWorking] = useState(false)
   const [coverProgress, setCoverProgress] = useState<CoverFetchProgress | null>(null)
   const coverAbort = useRef<AbortController | null>(null)
-  const [pixDraft, setPixDraft] = useState(settings.pixKey ?? '')
-  const [noteDraft, setNoteDraft] = useState(settings.donationNote ?? '')
-  const [pixSaved, setPixSaved] = useState(false)
-
-  function savePix() {
-    onUpdate({
-      pixKey: pixDraft.trim() || undefined,
-      donationNote: noteDraft.trim() || undefined,
-    })
-    setPixSaved(true)
-    setTimeout(() => setPixSaved(false), 2000)
-  }
 
   async function toggleNotifications(enabled: boolean) {
     if (enabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -153,46 +141,6 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
           checked={settings.translateTitles}
           onChange={(v) => onUpdate({ translateTitles: v })}
         />
-
-        {/* Doações (só o dono, aqui nas configurações, altera a chave) */}
-        <div className="space-y-2 border-t border-paper-200 pt-4 dark:border-ink-700">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-            Doações
-          </p>
-          <p className="text-xs leading-relaxed text-ink-500 dark:text-ink-400">
-            A chave abaixo aparece na tela de doações (💚 no topo) para quem quiser ajudar.
-            Só quem abre estas configurações consegue alterá-la.
-          </p>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-ink-600 dark:text-paper-300">Chave PIX</span>
-            <input
-              value={pixDraft}
-              onChange={(e) => setPixDraft(e.target.value)}
-              placeholder="e-mail, telefone, CPF/CNPJ ou chave aleatória"
-              className="w-full rounded-xl border border-paper-300 bg-white px-3 py-2 text-sm text-ink-700 outline-none focus:border-accent-500 dark:border-ink-600 dark:bg-ink-900 dark:text-paper-100"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-ink-600 dark:text-paper-300">Recado (opcional)</span>
-            <textarea
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              rows={2}
-              placeholder="ex.: Sua doação ajuda a manter a biblioteca da turma 💚"
-              className="w-full rounded-xl border border-paper-300 bg-white px-3 py-2 text-sm text-ink-700 outline-none focus:border-accent-500 dark:border-ink-600 dark:bg-ink-900 dark:text-paper-100"
-            />
-          </label>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={savePix}
-              className="rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.99]"
-            >
-              Salvar chave
-            </button>
-            {pixSaved && <span className="animate-fade-in text-xs text-accent-600 dark:text-accent-400">Salvo ✓</span>}
-          </div>
-        </div>
 
         {/* Manutenção da biblioteca */}
         <div className="space-y-2 border-t border-paper-200 pt-4 dark:border-ink-700">

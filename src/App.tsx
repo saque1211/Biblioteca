@@ -394,7 +394,7 @@ export default function App() {
       )}
 
       {donationsOpen && (
-        <DonationModal settings={settings} onClose={() => setDonationsOpen(false)} />
+        <DonationModal onClose={() => setDonationsOpen(false)} />
       )}
 
       {settingsOpen && (
