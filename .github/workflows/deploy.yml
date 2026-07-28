@@ -24,8 +24,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Produção (raiz /Biblioteca/): comportamento atual, sem chave.
+      # Produção (raiz /Biblioteca/): agora TAMBÉM com a chave do Google Books
+      # (busca confiável para todos), depois de confirmada no beta.
       - run: npm run build
+        env:
+          VITE_GOOGLE_BOOKS_KEY: ${{ secrets.GOOGLE_BOOKS_KEY }}
       # Canal de teste (/Biblioteca/beta/): mesma base de código, mas com a
       # chave do Google Books (se configurada em Secrets) para testar a busca.
       # É construído DEPOIS da produção, para dentro de dist/beta.
