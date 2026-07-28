@@ -1,4 +1,5 @@
 import { searchBooks } from '../api/books'
+import type { ApiBookResult } from '../types'
 import { db } from '../db/db'
 import type { Book } from '../types'
 import { coverFromIsbn } from './isbnCover'
@@ -25,6 +26,32 @@ function needsCover(b: Book): boolean {
   return !b.coverUrl || !REAL_COVER.test(b.coverUrl)
 }
 
+const norm = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2)
+
+/**
+ * Confere se o resultado é o mesmo livro, para não pegar a capa de outro livro
+ * numa busca por título. Exige ao menos 2 palavras significativas em comum no
+ * título (ou todas, se o título for muito curto).
+ */
+function sameBook(book: Book, result: ApiBookResult): boolean {
+  const want = norm(book.title)
+  if (want.length === 0) return true
+  const have = new Set(norm(result.title))
+  const common = want.filter((w) => have.has(w)).length
+  return common >= Math.min(2, want.length)
+}
+
+function firstCover(results: ApiBookResult[]): string | undefined {
+  return results.find((r) => r.coverUrl && REAL_COVER.test(r.coverUrl))?.coverUrl
+}
+
 /** Quantos livros estão sem capa (candidatos à busca). */
 export async function countBooksWithoutCover(): Promise<number> {
   const books = await db.books.toArray()
@@ -45,26 +72,40 @@ export async function fetchMissingCovers(
   let done = 0
   let found = 0
 
+  const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError'
+
   for (const book of books) {
     if (signal?.aborted) break
     const isbn = book.isbn?.replace(/[-\s]/g, '')
-    const query = isbn || `${book.title} ${book.authors[0] ?? ''}`.trim()
     let cover: string | undefined
-    if (query) {
+    let aborted = false
+
+    // 1) Com ISBN: tenta a edição exata (Google) e a capa da Open Library por ISBN
+    if (isbn) {
       try {
-        const results = await searchBooks(query, signal)
-        // Com ISBN, a busca já traz a edição exata; caso contrário, pega o
-        // primeiro resultado que tenha capa de verdade.
-        const match = results.find((r) => r.coverUrl && REAL_COVER.test(r.coverUrl))
-        cover = match?.coverUrl
+        cover = firstCover(await searchBooks(isbn, signal))
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') break
-        // Sem rede ou sem resultado para este livro — segue para o próximo.
+        if (isAbort(err)) aborted = true
+      }
+      if (aborted) break
+      if (!cover) cover = await coverFromIsbn(isbn)
+    }
+
+    // 2) Sem capa ainda: busca por título + autor (pega a capa de QUALQUER
+    //    edição do mesmo livro — é a mesma capa que aparece na busca normal),
+    //    conferindo que o resultado é realmente o mesmo livro
+    if (!cover) {
+      const titleQuery = `${book.title} ${book.authors[0] ?? ''}`.trim()
+      if (titleQuery) {
+        try {
+          const results = (await searchBooks(titleQuery, signal)).filter((r) => sameBook(book, r))
+          cover = firstCover(results)
+        } catch (err) {
+          if (isAbort(err)) break
+        }
       }
     }
-    // 2ª fonte de capa: Open Library por ISBN (muitas edições que o Google
-    // acha sem imagem têm capa aqui)
-    if (!cover && isbn) cover = await coverFromIsbn(isbn)
+
     if (cover && book.id != null) {
       await db.books.update(book.id, { coverUrl: cover })
       found++
