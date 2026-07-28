@@ -145,6 +145,23 @@ export function StatsView({ books, showChildStats, showInvested, onOpenFiltered,
     const readBooks = books.filter((b) => b.readingStatus === 'lido')
     const pagesRead = readBooks.reduce((s, b) => s + (b.pageCount ?? 0), 0)
 
+    // Leituras por mês (últimos 12 meses, pela data de término)
+    const monthIndex = new Map<string, number>()
+    const monthly: { key: string; month: number; year: number; count: number }[] = []
+    const base = new Date()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(base.getFullYear(), base.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      monthIndex.set(key, monthly.length)
+      monthly.push({ key, month: d.getMonth(), year: d.getFullYear(), count: 0 })
+    }
+    for (const book of books) {
+      if (!book.readingEnd) continue
+      const key = book.readingEnd.slice(0, 7)
+      const idx = monthIndex.get(key)
+      if (idx != null) monthly[idx].count++
+    }
+
     return {
       totalBooks: books.length,
       invested: books.reduce((s, b) => s + (b.pricePaid ?? 0), 0),
@@ -168,6 +185,7 @@ export function StatsView({ books, showChildStats, showInvested, onOpenFiltered,
       avgRating: ratedCount ? ratingSum / ratedCount : 0,
       pagesRead,
       readTotal: readBooks.length,
+      monthly,
     }
   }, [books])
 
@@ -236,6 +254,9 @@ export function StatsView({ books, showChildStats, showInvested, onOpenFiltered,
         </div>
       </div>
 
+      {/* Gráfico: leituras por mês (últimos 12 meses) */}
+      <MonthlyReadingChart data={stats.monthly} onSelectMonth={(key) => onOpenFiltered({ readMonth: key })} />
+
       <div className="grid gap-4 md:grid-cols-2">
         {showChildStats && (
           <>
@@ -303,6 +324,69 @@ export function StatsView({ books, showChildStats, showInvested, onOpenFiltered,
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+interface MonthPoint {
+  key: string
+  month: number
+  year: number
+  count: number
+}
+
+/**
+ * Gráfico de colunas: livros lidos por mês nos últimos 12 meses. Série única
+ * (cor de destaque do app), colunas ancoradas na base com topo arredondado.
+ * Cada coluna é clicável e leva à Biblioteca filtrada por aquele mês.
+ */
+function MonthlyReadingChart({ data, onSelectMonth }: { data: MonthPoint[]; onSelectMonth: (key: string) => void }) {
+  const max = Math.max(1, ...data.map((d) => d.count))
+  const total = data.reduce((s, d) => s + d.count, 0)
+
+  return (
+    <div className="rounded-2xl border border-paper-200/80 bg-white p-4 shadow-card dark:border-ink-700 dark:bg-ink-800">
+      <h3 className="font-serif text-base font-semibold text-ink-800 dark:text-paper-100">📈 Leituras por mês</h3>
+      <p className="mb-4 text-xs text-ink-400 dark:text-ink-500">
+        últimos 12 meses — toque numa coluna para ver os livros
+      </p>
+      {total === 0 ? (
+        <p className="py-6 text-center text-sm text-ink-500 dark:text-ink-400">
+          Nenhuma leitura com data de término registrada nos últimos 12 meses.
+          Preencha o “Término da leitura” nos livros para ver o gráfico.
+        </p>
+      ) : (
+        <div className="flex items-end gap-1.5" style={{ height: 148 }}>
+          {data.map((d) => {
+            const label = `${MONTHS_SHORT[d.month]} ${d.year}: ${d.count} ${d.count === 1 ? 'livro' : 'livros'}`
+            const heightPct = (d.count / max) * 100
+            return (
+              <div key={d.key} className="flex h-full min-w-0 flex-1 flex-col items-center">
+                <span className="mb-1 h-4 text-[10px] font-semibold text-ink-500 dark:text-ink-400">
+                  {d.count > 0 ? d.count : ''}
+                </span>
+                <div className="flex w-full flex-1 items-end">
+                  <button
+                    type="button"
+                    disabled={d.count === 0}
+                    onClick={() => onSelectMonth(d.key)}
+                    title={label}
+                    aria-label={label}
+                    className="group w-full rounded-t bg-accent-500 transition-all enabled:hover:bg-accent-600 disabled:bg-paper-200 dark:disabled:bg-ink-700"
+                    style={{ height: `${Math.max(d.count > 0 ? 6 : 2, heightPct)}%` }}
+                  />
+                </div>
+                <span className="mt-1.5 text-[10px] text-ink-400 dark:text-ink-500">{MONTHS_SHORT[d.month]}</span>
+                {(d.month === 0 || d.key === data[0].key) && (
+                  <span className="text-[9px] font-semibold text-ink-400 dark:text-ink-500">{String(d.year).slice(2)}</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

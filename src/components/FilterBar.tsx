@@ -25,6 +25,8 @@ export interface Filters {
   format: '' | BookFormat
   loan: LoanFilter
   readWithin: ReadWithin
+  /** Lido em um mês específico (formato "AAAA-MM"), definido pelo gráfico. */
+  readMonth: string
   language: string
   tag: string
   condition: '' | BookCondition
@@ -47,6 +49,7 @@ export const DEFAULT_FILTERS: Filters = {
   format: '',
   loan: '',
   readWithin: '',
+  readMonth: '',
   language: '',
   tag: '',
   condition: '',
@@ -94,6 +97,10 @@ export function applyFilters(books: Book[], f: Filters): Book[] {
       // Lido no período: usa a data de término da leitura
       const end = b.readingEnd ? new Date(b.readingEnd) : null
       if (!end || Number.isNaN(end.getTime()) || end < readCutoff) return false
+    }
+    if (f.readMonth) {
+      // Lido num mês específico (AAAA-MM), pela data de término
+      if (!(b.readingEnd ?? '').startsWith(f.readMonth)) return false
     }
     if (f.language && (b.language ?? '').toLowerCase() !== f.language.toLowerCase()) return false
     if (f.tag && !b.tags.includes(f.tag)) return false
@@ -159,7 +166,7 @@ export function FilterBar({ books, filters, onChange, resultCount }: FilterBarPr
   const activeCount = [
     filters.genre, filters.status, filters.acquisitionCategory, filters.origin,
     filters.author, filters.priceMin, filters.priceMax, filters.format,
-    filters.loan, filters.readWithin, filters.language, filters.tag, filters.condition, filters.publisher,
+    filters.loan, filters.readWithin, filters.readMonth, filters.language, filters.tag, filters.condition, filters.publisher,
     filters.minRating > 0 ? 'r' : '', filters.favoritesOnly ? 'f' : '',
   ].filter(Boolean).length
 
