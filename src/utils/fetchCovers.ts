@@ -1,6 +1,7 @@
 import { searchBooks } from '../api/books'
 import { db } from '../db/db'
 import type { Book } from '../types'
+import { coverFromIsbn } from './isbnCover'
 
 /**
  * Busca capas na internet para os livros que estão sem imagem — útil depois de
@@ -48,20 +49,25 @@ export async function fetchMissingCovers(
     if (signal?.aborted) break
     const isbn = book.isbn?.replace(/[-\s]/g, '')
     const query = isbn || `${book.title} ${book.authors[0] ?? ''}`.trim()
+    let cover: string | undefined
     if (query) {
       try {
         const results = await searchBooks(query, signal)
         // Com ISBN, a busca já traz a edição exata; caso contrário, pega o
         // primeiro resultado que tenha capa de verdade.
         const match = results.find((r) => r.coverUrl && REAL_COVER.test(r.coverUrl))
-        if (match?.coverUrl && book.id != null) {
-          await db.books.update(book.id, { coverUrl: match.coverUrl })
-          found++
-        }
+        cover = match?.coverUrl
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') break
         // Sem rede ou sem resultado para este livro — segue para o próximo.
       }
+    }
+    // 2ª fonte de capa: Open Library por ISBN (muitas edições que o Google
+    // acha sem imagem têm capa aqui)
+    if (!cover && isbn) cover = await coverFromIsbn(isbn)
+    if (cover && book.id != null) {
+      await db.books.update(book.id, { coverUrl: cover })
+      found++
     }
     done++
     onProgress({ done, total, found })

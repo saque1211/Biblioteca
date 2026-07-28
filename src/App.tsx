@@ -23,6 +23,7 @@ import { profileFlags, useSettings } from './hooks/useSettings'
 import { useTheme } from './hooks/useTheme'
 import type { ApiBookResult, Book } from './types'
 import { formatDate, todayISO } from './utils/format'
+import { coverFromIsbn } from './utils/isbnCover'
 import { overdueBooks } from './utils/loans'
 import { retroTranslateTitles } from './utils/retroTranslate'
 
@@ -131,6 +132,14 @@ export default function App() {
       language: languageLabel(result.language),
       ...newBookDefaults(),
     })
+
+    // Capa faltando (comum em edições brasileiras no Google): tenta a Open
+    // Library por ISBN em segundo plano
+    if (!result.coverUrl && result.isbn) {
+      coverFromIsbn(result.isbn).then((cover) => {
+        if (cover) updateBook(id, { coverUrl: cover })
+      })
+    }
 
     // Complementos em segundo plano (não atrasam a adição):
     // sinopse/gênero faltantes e tradução do título para o português
