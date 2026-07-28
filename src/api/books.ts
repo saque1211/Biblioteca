@@ -19,13 +19,41 @@ async function searchSources(query: string, signal?: AbortSignal): Promise<ApiBo
   }
 }
 
+// Cache de buscas na sessão: a mesma consulta não bate de novo nas APIs
+// (economiza a cota do Google Books e deixa a resposta instantânea).
+const searchCache = new Map<string, ApiBookResult[]>()
+const CACHE_LIMIT = 200
+
+function cacheKey(query: string): string {
+  return query.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
 /**
  * Busca com fallback em camadas:
  * 1. Google Books (edições PT primeiro) → 2. Open Library →
  * 3. consulta traduzida para o inglês (muitos livros só estão
  *    catalogados pelo título original) nas duas fontes de novo.
+ * Resultados são guardados em cache por consulta.
  */
 export async function searchBooks(query: string, signal?: AbortSignal): Promise<ApiBookResult[]> {
+  const key = cacheKey(query)
+  if (key) {
+    const cached = searchCache.get(key)
+    if (cached) return cached
+  }
+
+  const found = await searchOnce(query, signal)
+
+  // Só guarda buscas bem-sucedidas (não cacheia "nada encontrado", que pode
+  // ser um 429 temporário — assim uma nova tentativa ainda pode achar)
+  if (key && found.length > 0) {
+    if (searchCache.size >= CACHE_LIMIT) searchCache.delete(searchCache.keys().next().value!)
+    searchCache.set(key, found)
+  }
+  return found
+}
+
+async function searchOnce(query: string, signal?: AbortSignal): Promise<ApiBookResult[]> {
   const results = await searchSources(query, signal)
   if (results.length > 0) return results
 
