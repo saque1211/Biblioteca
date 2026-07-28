@@ -104,16 +104,42 @@ public class MainActivity extends Activity {
                 // A página pediu explicitamente a câmera (capture): abre a câmera
                 // direto — é o que o botão "Fotografar capa" espera.
                 boolean wantsCamera = params != null && params.isCaptureEnabled();
+                Intent camera = buildCameraIntent();
 
-                if (wantsCamera && launchCamera()) {
+                if (wantsCamera && camera != null) {
+                    try {
+                        startActivityForResult(camera, FILE_CHOOSER_CODE);
+                        return true;
+                    } catch (Exception e) {
+                        // cai para o seletor abaixo, reaproveitando o mesmo intent
+                    }
+                }
+
+                if (imageOnly) {
+                    // Campo de imagem (capa/scanner): oferece galeria/arquivos E a
+                    // câmera juntos — assim a câmera aparece mesmo quando o WebView
+                    // não sinaliza o "capture".
+                    Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                    pick.addCategory(Intent.CATEGORY_OPENABLE);
+                    pick.setType("image/*");
+                    Intent chooser = Intent.createChooser(pick, "Capa do livro");
+                    if (camera != null) {
+                        chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{ camera });
+                    }
+                    try {
+                        startActivityForResult(chooser, FILE_CHOOSER_CODE);
+                    } catch (Exception e) {
+                        filePathCallback = null;
+                        return false;
+                    }
                     return true;
                 }
 
-                // Caso contrário (ou sem câmera): seletor de arquivos/galeria
-                // (mostra Drive, OneDrive, Meus arquivos, Fotos, etc.)
+                // Não-imagem (importar planilha/JSON): seletor de documentos
+                // (mostra Drive, OneDrive, Meus arquivos, etc.)
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType(imageOnly ? "image/*" : "*/*");
+                intent.setType("*/*");
                 try {
                     startActivityForResult(intent, FILE_CHOOSER_CODE);
                 } catch (Exception e) {
@@ -130,27 +156,26 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Abre o app de câmera para tirar a foto da capa, gravando numa URI
-     * temporária (FileProvider). Devolve false se não houver câmera/app.
+     * Monta o intent para o app de câmera tirar a foto da capa, gravando numa
+     * URI temporária (FileProvider) que guardamos em cameraImageUri. Devolve
+     * null se não houver app de câmera disponível.
      */
-    private boolean launchCamera() {
+    private Intent buildCameraIntent() {
         try {
+            Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            if (cam.resolveActivity(getPackageManager()) == null) {
+                return null;
+            }
             File dir = new File(getCacheDir(), "camera");
             dir.mkdirs();
             File photo = new File(dir, "cover_" + System.currentTimeMillis() + ".jpg");
             cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", photo);
-            Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             cam.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             cam.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            if (cam.resolveActivity(getPackageManager()) == null) {
-                cameraImageUri = null;
-                return false;
-            }
-            startActivityForResult(cam, FILE_CHOOSER_CODE);
-            return true;
+            return cam;
         } catch (Exception e) {
             cameraImageUri = null;
-            return false;
+            return null;
         }
     }
 
