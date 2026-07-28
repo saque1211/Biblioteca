@@ -100,8 +100,13 @@ export function Header({
               </svg>
             </div>
             <div>
-              <h1 className="font-serif text-lg font-semibold leading-tight text-ink-800 dark:text-paper-100">
+              <h1 className="flex items-center gap-1.5 font-serif text-lg font-semibold leading-tight text-ink-800 dark:text-paper-100">
                 Minha Biblioteca
+                {import.meta.env.VITE_CHANNEL === 'beta' && (
+                  <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950">
+                    Beta
+                  </span>
+                )}
               </h1>
               <p className="text-xs text-ink-500 dark:text-ink-400">
                 {total} {total === 1 ? 'livro' : 'livros'} · {read} {read === 1 ? 'lido' : 'lidos'}

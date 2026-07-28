@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Disponível no Node ao rodar o build; declarado aqui para dispensar @types/node
+declare const process: { env: Record<string, string | undefined> }
+
 export default defineConfig({
   // Servido em https://<usuario>.github.io/Biblioteca/
   base: '/Biblioteca/',
@@ -11,6 +14,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // No canal de teste (/beta) não registramos service worker: assim o beta
+      // nunca fica em cache nem conflita com o app de produção.
+      disable: process.env.VITE_CHANNEL === 'beta',
       includeAssets: ['apple-touch-icon.png'],
       manifest: {
         name: 'Minha Biblioteca',
@@ -32,6 +38,8 @@ export default defineConfig({
         // guardados apenas quando o scanner é usado pela primeira vez
         globIgnores: ['**/ocr/**'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // O SW de produção não deve responder pelas rotas do canal de teste
+        navigateFallbackDenylist: [/\/beta\//],
         // Capas de livros: cache-first para funcionarem offline depois de vistas
         runtimeCaching: [
           {

@@ -125,8 +125,20 @@ function toResult(v: GoogleVolume): ApiBookResult | null {
 }
 
 /**
- * Busca livros na Google Books API (sem chave, endpoint público).
- * Aceita título, autor ou ISBN.
+ * Chave da API do Google Books. Quando presente, a busca ganha uma cota
+ * própria e deixa de ser bloqueada (429) pelo limite compartilhado sem chave.
+ */
+const API_KEY = import.meta.env.VITE_GOOGLE_BOOKS_KEY?.trim()
+
+function withKey(url: string): string {
+  return API_KEY ? `${url}&key=${API_KEY}` : url
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Busca livros na Google Books API. Aceita título, autor ou ISBN.
+ * Usa a chave (se configurada) e tenta de novo uma vez quando leva 429.
  */
 export async function searchGoogleBooks(query: string, signal?: AbortSignal): Promise<ApiBookResult[]> {
   const q = query.trim()
@@ -138,24 +150,30 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
   const base = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(finalQuery)}&maxResults=10&printType=books`
 
   async function fetchItems(url: string): Promise<GoogleVolume[]> {
-    const res = await fetch(url, { signal })
+    let res = await fetch(withKey(url), { signal })
+    // 429 = limite de cota. Sem chave é comum; espera um pouco e tenta 1 vez mais.
+    if (res.status === 429) {
+      await sleep(600)
+      if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+      res = await fetch(withKey(url), { signal })
+    }
     if (!res.ok) throw new Error(`Google Books respondeu ${res.status}`)
     const data = await res.json()
     return data.items ?? []
   }
 
-  // Duas buscas em paralelo: edições em português primeiro, demais idiomas completando.
-  // ISBN identifica uma edição exata, então dispensa a busca restrita a PT.
-  const requests = isIsbn
-    ? [fetchItems(base)]
-    : [fetchItems(`${base}&langRestrict=pt`), fetchItems(base)]
-  const settled = await Promise.allSettled(requests)
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-  const items = settled.flatMap((s) => (s.status === 'fulfilled' ? s.value : []))
-  // Todas as chamadas falharam: propaga para acionar o fallback da Open Library
-  if (items.length === 0 && settled.every((s) => s.status === 'rejected')) {
-    throw (settled[0] as PromiseRejectedResult).reason
+  // Busca sequencial para gastar menos cota: edições em português primeiro; só
+  // amplia para os demais idiomas se vier pouca coisa. ISBN dispensa o filtro PT.
+  let items: GoogleVolume[]
+  if (isIsbn) {
+    items = await fetchItems(base)
+  } else {
+    const pt = await fetchItems(`${base}&langRestrict=pt`)
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+    // Poucos resultados em PT: completa com a busca sem restrição de idioma
+    items = pt.length >= 5 ? pt : [...pt, ...(await fetchItems(base))]
   }
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
   const results: ApiBookResult[] = []
   const seen = new Set<string>()

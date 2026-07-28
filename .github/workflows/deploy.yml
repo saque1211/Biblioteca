@@ -24,7 +24,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Produção (raiz /Biblioteca/): comportamento atual, sem chave.
       - run: npm run build
+      # Canal de teste (/Biblioteca/beta/): mesma base de código, mas com a
+      # chave do Google Books (se configurada em Secrets) para testar a busca.
+      # É construído DEPOIS da produção, para dentro de dist/beta.
+      - run: npm run build -- --base=/Biblioteca/beta/ --outDir dist/beta
+        env:
+          VITE_CHANNEL: beta
+          VITE_GOOGLE_BOOKS_KEY: ${{ secrets.GOOGLE_BOOKS_KEY }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true
