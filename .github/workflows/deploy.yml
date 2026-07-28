@@ -29,7 +29,9 @@ jobs:
       # Canal de teste (/Biblioteca/beta/): mesma base de código, mas com a
       # chave do Google Books (se configurada em Secrets) para testar a busca.
       # É construído DEPOIS da produção, para dentro de dist/beta.
-      - run: npm run build -- --base=/Biblioteca/beta/ --outDir dist/beta
+      - run: |
+          echo "Tamanho da chave recebida do secret: ${#VITE_GOOGLE_BOOKS_KEY} (esperado ~39; 0 = secret não configurado)"
+          npm run build -- --base=/Biblioteca/beta/ --outDir dist/beta
         env:
           VITE_CHANNEL: beta
           VITE_GOOGLE_BOOKS_KEY: ${{ secrets.GOOGLE_BOOKS_KEY }}
