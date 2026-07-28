@@ -10,8 +10,8 @@ android {
         applicationId "com.saque.biblioteca"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
     }
 
     signingConfigs {
@@ -34,4 +34,9 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // FileProvider: entrega uma URI de escrita para o app de câmera (foto da capa)
+    implementation 'androidx.core:core:1.13.1'
 }

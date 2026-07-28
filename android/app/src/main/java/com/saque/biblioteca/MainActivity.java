@@ -20,6 +20,8 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -32,6 +34,7 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
+    private Uri cameraImageUri;
     private static final int FILE_CHOOSER_CODE = 1001;
     private static final String APP_URL = "https://saque1211.github.io/Biblioteca/";
 
@@ -89,6 +92,7 @@ public class MainActivity extends Activity {
                     filePathCallback.onReceiveValue(null);
                 }
                 filePathCallback = callback;
+                cameraImageUri = null;
 
                 boolean imageOnly = false;
                 String[] accept = params != null ? params.getAcceptTypes() : null;
@@ -97,7 +101,16 @@ public class MainActivity extends Activity {
                         if (a != null && a.startsWith("image/")) imageOnly = true;
                     }
                 }
+                // A página pediu explicitamente a câmera (capture): abre a câmera
+                // direto — é o que o botão "Fotografar capa" espera.
+                boolean wantsCamera = params != null && params.isCaptureEnabled();
 
+                if (wantsCamera && launchCamera()) {
+                    return true;
+                }
+
+                // Caso contrário (ou sem câmera): seletor de arquivos/galeria
+                // (mostra Drive, OneDrive, Meus arquivos, Fotos, etc.)
                 Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType(imageOnly ? "image/*" : "*/*");
@@ -113,6 +126,31 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState == null) {
             webView.loadUrl(APP_URL);
+        }
+    }
+
+    /**
+     * Abre o app de câmera para tirar a foto da capa, gravando numa URI
+     * temporária (FileProvider). Devolve false se não houver câmera/app.
+     */
+    private boolean launchCamera() {
+        try {
+            File dir = new File(getCacheDir(), "camera");
+            dir.mkdirs();
+            File photo = new File(dir, "cover_" + System.currentTimeMillis() + ".jpg");
+            cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", photo);
+            Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            cam.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
+            cam.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (cam.resolveActivity(getPackageManager()) == null) {
+                cameraImageUri = null;
+                return false;
+            }
+            startActivityForResult(cam, FILE_CHOOSER_CODE);
+            return true;
+        } catch (Exception e) {
+            cameraImageUri = null;
+            return false;
         }
     }
 
@@ -182,13 +220,20 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_CHOOSER_CODE) {
             Uri[] result = null;
-            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
-                result = new Uri[]{ data.getData() };
+            if (resultCode == RESULT_OK) {
+                if (data != null && data.getData() != null) {
+                    // Arquivo/galeria escolhido
+                    result = new Uri[]{ data.getData() };
+                } else if (cameraImageUri != null) {
+                    // Foto tirada pela câmera (gravada na URI que passamos)
+                    result = new Uri[]{ cameraImageUri };
+                }
             }
             if (filePathCallback != null) {
                 filePathCallback.onReceiveValue(result);
                 filePathCallback = null;
             }
+            cameraImageUri = null;
         } else {
             super.onActivityResult(requestCode, resultCode, data);
         }

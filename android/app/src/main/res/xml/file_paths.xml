@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Pasta interna de cache onde a foto da câmera é gravada temporariamente -->
+    <cache-path name="camera" path="camera/" />
+</paths>
