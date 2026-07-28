@@ -58,10 +58,42 @@ export async function countBooksWithoutCover(): Promise<number> {
   return books.filter(needsCover).length
 }
 
+const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError'
+
+/** Quantos livros processar ao mesmo tempo (mais rápido, sem estourar a cota). */
+const CONCURRENCY = 5
+
+/** Acha a capa de um livro: ISBN exato → Open Library por ISBN → por título. */
+async function findCover(book: Book, signal?: AbortSignal): Promise<string | undefined> {
+  const isbn = book.isbn?.replace(/[-\s]/g, '')
+  let cover: string | undefined
+
+  if (isbn) {
+    try {
+      cover = firstCover(await searchBooks(isbn, signal))
+    } catch (err) {
+      if (isAbort(err)) return undefined
+    }
+    if (!cover) cover = await coverFromIsbn(isbn)
+  }
+
+  if (!cover) {
+    const titleQuery = `${book.title} ${book.authors[0] ?? ''}`.trim()
+    if (titleQuery) {
+      try {
+        cover = firstCover((await searchBooks(titleQuery, signal)).filter((r) => sameBook(book, r)))
+      } catch (err) {
+        if (isAbort(err)) return undefined
+      }
+    }
+  }
+  return cover
+}
+
 /**
- * Percorre os livros sem capa e tenta preencher a imagem. Chama `onProgress` a
- * cada livro e respeita `signal` para cancelamento. Um pequeno atraso entre as
- * consultas evita estourar os limites das APIs gratuitas.
+ * Percorre os livros SEM capa e tenta preencher a imagem — vários ao mesmo
+ * tempo, para ser rápido. Livros que já têm foto são ignorados. Chama
+ * `onProgress` a cada livro concluído e respeita `signal` para cancelamento.
  */
 export async function fetchMissingCovers(
   onProgress: (p: CoverFetchProgress) => void,
@@ -71,50 +103,23 @@ export async function fetchMissingCovers(
   const total = books.length
   let done = 0
   let found = 0
+  let next = 0
 
-  const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError'
-
-  for (const book of books) {
-    if (signal?.aborted) break
-    const isbn = book.isbn?.replace(/[-\s]/g, '')
-    let cover: string | undefined
-    let aborted = false
-
-    // 1) Com ISBN: tenta a edição exata (Google) e a capa da Open Library por ISBN
-    if (isbn) {
-      try {
-        cover = firstCover(await searchBooks(isbn, signal))
-      } catch (err) {
-        if (isAbort(err)) aborted = true
+  async function worker() {
+    while (!signal?.aborted) {
+      const i = next++
+      if (i >= books.length) return
+      const book = books[i]
+      const cover = await findCover(book, signal)
+      if (cover && book.id != null) {
+        await db.books.update(book.id, { coverUrl: cover })
+        found++
       }
-      if (aborted) break
-      if (!cover) cover = await coverFromIsbn(isbn)
+      done++
+      onProgress({ done, total, found })
     }
-
-    // 2) Sem capa ainda: busca por título + autor (pega a capa de QUALQUER
-    //    edição do mesmo livro — é a mesma capa que aparece na busca normal),
-    //    conferindo que o resultado é realmente o mesmo livro
-    if (!cover) {
-      const titleQuery = `${book.title} ${book.authors[0] ?? ''}`.trim()
-      if (titleQuery) {
-        try {
-          const results = (await searchBooks(titleQuery, signal)).filter((r) => sameBook(book, r))
-          cover = firstCover(results)
-        } catch (err) {
-          if (isAbort(err)) break
-        }
-      }
-    }
-
-    if (cover && book.id != null) {
-      await db.books.update(book.id, { coverUrl: cover })
-      found++
-    }
-    done++
-    onProgress({ done, total, found })
-    // Pausa curta para respeitar os limites das APIs gratuitas.
-    if (!signal?.aborted) await new Promise((r) => setTimeout(r, 250))
   }
 
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total) }, worker))
   return { done, total, found }
 }

@@ -6,7 +6,7 @@
  * de uma imagem em branco — então detectamos se a capa existe carregando a
  * imagem e conferindo se ela tem tamanho real.
  */
-export function coverFromIsbn(isbn?: string, timeoutMs = 6000): Promise<string | undefined> {
+export function coverFromIsbn(isbn?: string, timeoutMs = 3000): Promise<string | undefined> {
   const clean = isbn?.replace(/[-\s]/g, '')
   if (!clean) return Promise.resolve(undefined)
 
