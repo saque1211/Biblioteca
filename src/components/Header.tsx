@@ -6,7 +6,7 @@ import { exportBooksToXlsx, importBooksFromXlsx } from '../utils/excel'
 import { formatCurrency } from '../utils/format'
 import { Modal } from './ui/Modal'
 
-export type View = 'library' | 'calendar' | 'stats'
+export type View = 'library' | 'wishlist' | 'calendar' | 'stats'
 
 interface HeaderProps {
   books: Book[]
@@ -118,6 +118,9 @@ export function Header({
           <nav className="order-3 flex w-full justify-center gap-1 rounded-full bg-paper-100 p-1 dark:bg-ink-800 sm:order-none sm:w-auto" aria-label="Seções">
             <button type="button" className={tabClass(view === 'library')} onClick={() => onViewChange('library')}>
               Biblioteca
+            </button>
+            <button type="button" className={tabClass(view === 'wishlist')} onClick={() => onViewChange('wishlist')}>
+              🔖 Desejos
             </button>
             <button type="button" className={tabClass(view === 'calendar')} onClick={() => onViewChange('calendar')}>
               Agenda

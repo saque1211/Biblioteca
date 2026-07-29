@@ -77,6 +77,10 @@ export default function App() {
     [books, selectedId],
   )
   const visibleBooks = useMemo(() => applyFilters(books, filters), [books, filters])
+  const wishlistBooks = useMemo(
+    () => books.filter((b) => b.wishlist).sort((a, b) => b.addedAt.localeCompare(a.addedAt)),
+    [books],
+  )
   const selectedBooks = useMemo(
     () => books.filter((b) => b.id != null && selection.has(b.id)),
     [books, selection],
@@ -355,6 +359,48 @@ export default function App() {
                     </div>
                   </>
                 )}
+              </>
+            )}
+          </div>
+        )}
+        {view === 'wishlist' && (
+          <div className="space-y-6">
+            {wishlistBooks.length === 0 ? (
+              <div className="mx-auto max-w-md py-16 text-center">
+                <p className="text-4xl">🔖</p>
+                <h2 className="mt-3 font-serif text-lg font-semibold text-ink-800 dark:text-paper-100">
+                  Sua lista de desejos está vazia
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
+                  Abra qualquer livro e toque no marcador 🔖 (ao lado do coração) para adicioná-lo aqui.
+                  Depois é só usar os botões “Ver na Amazon / Mercado Livre” para comprar.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setView('library')}
+                  className="mt-4 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.98]"
+                >
+                  Ir para a Biblioteca
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-center text-sm text-ink-500 dark:text-ink-400">
+                  {wishlistBooks.length} {wishlistBooks.length === 1 ? 'livro desejado' : 'livros desejados'} · toque para ver onde comprar
+                </p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {wishlistBooks.map((book) => (
+                    <BookCard
+                      key={book.id}
+                      book={book}
+                      onOpen={(b) => setSelectedId(b.id ?? null)}
+                      selectionMode={selectionMode}
+                      selected={book.id != null && selection.has(book.id)}
+                      onToggleSelect={toggleSelect}
+                      onEnterSelection={toggleSelect}
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
