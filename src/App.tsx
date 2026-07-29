@@ -36,6 +36,7 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [manualAdd, setManualAdd] = useState<ManualAddInitial | null>(null)
+  const [manualWishlist, setManualWishlist] = useState(false)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [donationsOpen, setDonationsOpen] = useState(false)
@@ -76,16 +77,19 @@ export default function App() {
     () => books.find((b) => b.id === selectedId) ?? null,
     [books, selectedId],
   )
-  const visibleBooks = useMemo(() => applyFilters(books, filters), [books, filters])
+  // A lista de desejos é separada da biblioteca: livros marcados como
+  // `wishlist` ficam só na aba Desejos, não se misturam com o acervo.
+  const ownedBooks = useMemo(() => books.filter((b) => !b.wishlist), [books])
   const wishlistBooks = useMemo(
     () => books.filter((b) => b.wishlist).sort((a, b) => b.addedAt.localeCompare(a.addedAt)),
     [books],
   )
+  const visibleBooks = useMemo(() => applyFilters(ownedBooks, filters), [ownedBooks, filters])
   const selectedBooks = useMemo(
     () => books.filter((b) => b.id != null && selection.has(b.id)),
     [books, selection],
   )
-  const overdue = useMemo(() => overdueBooks(books), [books])
+  const overdue = useMemo(() => overdueBooks(ownedBooks), [ownedBooks])
 
   // Tradução retroativa: livros salvos antes da tradução automática (ou com
   // o serviço indisponível na época) ganham título em português ao abrir o app
@@ -122,7 +126,7 @@ export default function App() {
     }
   }
 
-  async function handleAddFromApi(result: ApiBookResult) {
+  async function handleAddFromApi(result: ApiBookResult, wishlist = false) {
     const id = await addBook({
       title: result.title,
       authors: result.authors,
@@ -135,6 +139,8 @@ export default function App() {
       synopsis: result.synopsis,
       language: languageLabel(result.language),
       ...newBookDefaults(),
+      // Item da lista de desejos: sem categoria de aquisição
+      ...(wishlist ? { wishlist: true, acquisitionCategory: undefined, acquisitionDate: undefined } : {}),
     })
 
     // Capa faltando (comum em edições brasileiras no Google): tenta a Open
@@ -165,8 +171,11 @@ export default function App() {
     }
   }
 
-  async function handleAddManually(data: Pick<Book, 'title' | 'authors' | 'coverUrl' | 'genre' | 'isbn' | 'publisher' | 'publishedYear' | 'pageCount' | 'synopsis'>) {
-    const id = await addBook({ ...data, ...newBookDefaults() })
+  async function handleAddManually(
+    data: Pick<Book, 'title' | 'authors' | 'coverUrl' | 'genre' | 'isbn' | 'publisher' | 'publishedYear' | 'pageCount' | 'synopsis'>,
+    wishlist = false,
+  ) {
+    const id = await addBook({ ...data, ...newBookDefaults(), ...(wishlist ? { wishlist: true } : {}) })
     if (settings.translateTitles) {
       translateText(data.title, 'auto', 'pt-BR').then((translated) => {
         if (translated) updateBook(id, { title: translated, originalTitle: data.title })
@@ -221,7 +230,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <Header
-        books={books}
+        books={ownedBooks}
         view={view}
         onViewChange={setView}
         theme={theme}
@@ -317,20 +326,23 @@ export default function App() {
           <div className="space-y-6">
             <SearchBar
               onSelect={handleAddFromApi}
-              onAddManually={(title) => setManualAdd({ title })}
+              onAddManually={(title) => {
+                setManualWishlist(false)
+                setManualAdd({ title })
+              }}
               onScan={() => setScanOpen(true)}
               batchCategory={batchCategory}
-              startExpanded={books.length === 0}
+              startExpanded={ownedBooks.length === 0}
               prefillQuery={searchPrefill}
               onPrefillConsumed={() => setSearchPrefill(null)}
             />
 
-            {books.length === 0 ? (
+            {ownedBooks.length === 0 ? (
               <EmptyState />
             ) : (
               <>
                 <FilterBar
-                  books={books}
+                  books={ownedBooks}
                   filters={filters}
                   onChange={setFilters}
                   resultCount={visibleBooks.length}
@@ -365,23 +377,32 @@ export default function App() {
         )}
         {view === 'wishlist' && (
           <div className="space-y-6">
+            <SearchBar
+              onSelect={(r) => handleAddFromApi(r, true)}
+              onAddManually={(title) => {
+                setManualWishlist(true)
+                setManualAdd({ title })
+              }}
+              onScan={() => setScanOpen(true)}
+              hideScan
+              batchCategory={null}
+              startExpanded
+              placeholder="Busque um livro para desejar…"
+            />
+            <p className="text-center text-[11px] text-ink-400 dark:text-ink-500">
+              Livros que você quer comprar ficam aqui, separados da sua biblioteca.
+            </p>
+
             {wishlistBooks.length === 0 ? (
-              <div className="mx-auto max-w-md py-16 text-center">
+              <div className="mx-auto max-w-md py-10 text-center">
                 <p className="text-4xl">🔖</p>
                 <h2 className="mt-3 font-serif text-lg font-semibold text-ink-800 dark:text-paper-100">
                   Sua lista de desejos está vazia
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-ink-500 dark:text-ink-400">
-                  Abra qualquer livro e toque no marcador 🔖 (ao lado do coração) para adicioná-lo aqui.
-                  Depois é só usar os botões “Ver na Amazon / Mercado Livre” para comprar.
+                  Use a busca acima para adicionar livros que você quer comprar. Depois é só tocar em
+                  “Ver na Amazon / Mercado Livre” para ver o preço e comprar.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setView('library')}
-                  className="mt-4 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.98]"
-                >
-                  Ir para a Biblioteca
-                </button>
               </div>
             ) : (
               <>
@@ -405,10 +426,10 @@ export default function App() {
             )}
           </div>
         )}
-        {view === 'calendar' && <CalendarView books={books} />}
+        {view === 'calendar' && <CalendarView books={ownedBooks} />}
         {view === 'stats' && (
           <StatsView
-            books={books}
+            books={ownedBooks}
             showChildStats={flags.childStats}
             showInvested={flags.invested}
             onOpenFiltered={(partial) => {
@@ -440,8 +461,11 @@ export default function App() {
       {manualAdd !== null && (
         <ManualAddModal
           initial={manualAdd}
-          onAdd={handleAddManually}
-          onClose={() => setManualAdd(null)}
+          onAdd={(data) => handleAddManually(data, manualWishlist)}
+          onClose={() => {
+            setManualAdd(null)
+            setManualWishlist(false)
+          }}
         />
       )}
 
@@ -456,7 +480,7 @@ export default function App() {
 
       {batchModalOpen && (
         <BatchCategoryModal
-          books={books}
+          books={ownedBooks}
           current={batchCategory}
           onSet={setBatchCategory}
           onClose={() => setBatchModalOpen(false)}

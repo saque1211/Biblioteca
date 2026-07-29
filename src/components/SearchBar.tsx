@@ -14,9 +14,13 @@ interface SearchBarProps {
   /** Consulta vinda de fora (ex.: scanner) — abre a busca já preenchida. */
   prefillQuery?: string | null
   onPrefillConsumed?: () => void
+  /** Esconde o botão de escanear (ex.: na lista de desejos). */
+  hideScan?: boolean
+  /** Texto do campo de busca. */
+  placeholder?: string
 }
 
-export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, startExpanded = false, prefillQuery, onPrefillConsumed }: SearchBarProps) {
+export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, startExpanded = false, prefillQuery, onPrefillConsumed, hideScan = false, placeholder }: SearchBarProps) {
   const [expanded, setExpanded] = useState(startExpanded)
 
   useEffect(() => {
@@ -128,9 +132,11 @@ export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, star
           </svg>
           Buscar e adicionar livro
         </button>
-        <button type="button" onClick={onScan} className={pillClass}>
-          📷 Escanear capa
-        </button>
+        {!hideScan && (
+          <button type="button" onClick={onScan} className={pillClass}>
+            📷 Escanear capa
+          </button>
+        )}
         {justAdded && (
           <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 animate-pop whitespace-nowrap rounded-full bg-accent-600 px-4 py-1.5 text-sm font-medium text-white shadow-card">
             ✓ “{justAdded}” adicionado
@@ -157,7 +163,7 @@ export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, star
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.trim().length >= 3 && setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Busque por título, autor ou ISBN para adicionar…"
+          placeholder={placeholder ?? 'Busque por título, autor ou ISBN para adicionar…'}
           aria-label="Buscar livro para adicionar"
           className="w-full rounded-2xl border border-paper-300 bg-white py-3.5 pl-12 pr-12 text-[15px] text-ink-700 shadow-card transition-all placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-4 focus:ring-accent-500/15 dark:border-ink-600 dark:bg-ink-800 dark:text-paper-100 dark:placeholder:text-ink-500"
         />
@@ -167,18 +173,20 @@ export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, star
           </div>
         )}
       </div>
-      <button
-        type="button"
-        title="Escanear capa com a câmera"
-        aria-label="Escanear capa com a câmera"
-        onClick={onScan}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-paper-200/70 hover:text-accent-600 dark:text-ink-500 dark:hover:bg-ink-700"
-      >
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7}>
-          <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-1.8A1.5 1.5 0 0 1 10 3.5h4a1.5 1.5 0 0 1 1.3.7L16.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" strokeLinejoin="round" />
-          <circle cx="12" cy="12.5" r="3.2" />
-        </svg>
-      </button>
+      {!hideScan && (
+        <button
+          type="button"
+          title="Escanear capa com a câmera"
+          aria-label="Escanear capa com a câmera"
+          onClick={onScan}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-paper-200/70 hover:text-accent-600 dark:text-ink-500 dark:hover:bg-ink-700"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7}>
+            <path d="M4 8a2 2 0 0 1 2-2h1.5l1.2-1.8A1.5 1.5 0 0 1 10 3.5h4a1.5 1.5 0 0 1 1.3.7L16.5 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" strokeLinejoin="round" />
+            <circle cx="12" cy="12.5" r="3.2" />
+          </svg>
+        </button>
+      )}
       {!startExpanded && (
         <button
           type="button"
