@@ -14,13 +14,12 @@ function query(book: Book): string {
 }
 
 /**
- * Busca na Amazon Brasil com a tag de afiliado. Usa a tag configurada no
- * aparelho, se houver; senão, a tag embutida do app (padrão).
+ * Busca na Amazon Brasil com a tag de afiliado embutida do app (a do dono).
+ * Não é configurável por aparelho — assim a comissão é sempre do dono.
  */
-export function amazonSearchUrl(book: Book, affiliateTag?: string): string {
+export function amazonSearchUrl(book: Book): string {
   const url = `https://www.amazon.com.br/s?k=${encodeURIComponent(query(book))}`
-  const tag = affiliateTag?.trim() || AMAZON_TAG
-  return tag ? `${url}&tag=${encodeURIComponent(tag)}` : url
+  return `${url}&tag=${encodeURIComponent(AMAZON_TAG)}`
 }
 
 /** Busca no Mercado Livre (busca por caminho, como o site faz). */

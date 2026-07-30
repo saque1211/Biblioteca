@@ -18,12 +18,10 @@ interface BookDetailPanelProps {
   onClose: () => void
   askReadOnReturn: boolean
   showClassReading: boolean
-  /** Código de afiliado da Amazon (opcional) para os links de compra. */
-  amazonTag?: string
 }
 
 /** Painel lateral de detalhes: dados bibliográficos + informações pessoais editáveis. */
-export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReading, amazonTag }: BookDetailPanelProps) {
+export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReading }: BookDetailPanelProps) {
   const [draft, setDraft] = useState<Book>(book)
   const [tagInput, setTagInput] = useState('')
   const [saved, setSaved] = useState(false)
@@ -168,7 +166,7 @@ export function BookDetailPanel({ book, onClose, askReadOnReturn, showClassReadi
             <SectionTitle>{draft.wishlist ? '🔖 Na lista de desejos · onde comprar' : 'Onde comprar'}</SectionTitle>
             <div className="mt-3 flex flex-wrap gap-2">
               <a
-                href={amazonSearchUrl(draft, amazonTag)}
+                href={amazonSearchUrl(draft)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 rounded-xl border border-paper-300 py-2.5 text-center text-sm font-medium text-ink-700 transition-colors hover:border-accent-500 hover:bg-paper-100 dark:border-ink-600 dark:text-paper-100 dark:hover:bg-ink-700"

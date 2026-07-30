@@ -454,7 +454,6 @@ export default function App() {
           onClose={() => setSelectedId(null)}
           askReadOnReturn={settings.askReadOnReturn}
           showClassReading={flags.classReading}
-          amazonTag={settings.amazonTag}
         />
       )}
 

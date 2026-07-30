@@ -142,23 +142,6 @@ export function SettingsModal({ settings, onUpdate, onClose, onChangeProfile }: 
           onChange={(v) => onUpdate({ translateTitles: v })}
         />
 
-        {/* Afiliado (comissão nos links de compra) */}
-        <div className="space-y-2 border-t border-paper-200 pt-4 dark:border-ink-700">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
-            Afiliado Amazon
-          </p>
-          <p className="text-xs leading-relaxed text-ink-500 dark:text-ink-400">
-            Se você tem código de afiliado da Amazon (Associados), cole aqui — os botões
-            “Ver na Amazon” passam a incluir seu código, e você ganha comissão nas compras.
-          </p>
-          <input
-            value={settings.amazonTag ?? ''}
-            onChange={(e) => onUpdate({ amazonTag: e.target.value.trim() || undefined })}
-            placeholder="ex.: seucodigo-20"
-            className="w-full rounded-xl border border-paper-300 bg-white px-3 py-2 text-sm text-ink-700 outline-none focus:border-accent-500 dark:border-ink-600 dark:bg-ink-900 dark:text-paper-100"
-          />
-        </div>
-
         {/* Manutenção da biblioteca */}
         <div className="space-y-2 border-t border-paper-200 pt-4 dark:border-ink-700">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-500 dark:text-ink-400">
