@@ -121,10 +121,10 @@ export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, star
   const pillClass =
     'flex items-center gap-2 rounded-full border border-paper-300 bg-white px-4 py-1.5 text-xs font-medium text-ink-500 shadow-card transition-all hover:border-accent-500 hover:text-accent-600 dark:border-ink-600 dark:bg-ink-800 dark:text-ink-400 dark:hover:border-accent-500 dark:hover:text-accent-400'
 
-  // Minimizada: só botões discretos para abrir a busca ou o scanner
+  // Minimizada: só botões discretos para abrir a busca, o scanner ou o cadastro manual
   if (!expanded) {
     return (
-      <div className="flex justify-center gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <button type="button" onClick={() => setExpanded(true)} className={pillClass}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="7" />
@@ -137,6 +137,9 @@ export function SearchBar({ onSelect, onAddManually, onScan, batchCategory, star
             📷 Escanear capa
           </button>
         )}
+        <button type="button" onClick={() => onAddManually('')} className={pillClass}>
+          ✍️ Adicionar manualmente
+        </button>
         {justAdded && (
           <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 animate-pop whitespace-nowrap rounded-full bg-accent-600 px-4 py-1.5 text-sm font-medium text-white shadow-card">
             ✓ “{justAdded}” adicionado

@@ -338,7 +338,12 @@ export default function App() {
             />
 
             {ownedBooks.length === 0 ? (
-              <EmptyState />
+              <EmptyState
+                onAddManually={() => {
+                  setManualWishlist(false)
+                  setManualAdd({})
+                }}
+              />
             ) : (
               <>
                 <FilterBar

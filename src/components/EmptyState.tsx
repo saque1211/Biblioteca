@@ -1,4 +1,8 @@
-export function EmptyState() {
+interface EmptyStateProps {
+  onAddManually: () => void
+}
+
+export function EmptyState({ onAddManually }: EmptyStateProps) {
   return (
     <div className="animate-slide-up py-16 text-center">
       <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-accent-100 to-paper-200 shadow-card dark:from-accent-700/30 dark:to-ink-800">
@@ -24,6 +28,16 @@ export function EmptyState() {
           9788535914849
         </kbd>
       </div>
+      <p className="mt-6 text-sm text-ink-400 dark:text-ink-500">
+        Não achou na busca? Cadastre você mesmo:
+      </p>
+      <button
+        type="button"
+        onClick={onAddManually}
+        className="mt-2 rounded-2xl border border-paper-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink-600 shadow-card transition-all hover:border-accent-500 hover:text-accent-600 active:scale-[0.98] dark:border-ink-600 dark:bg-ink-800 dark:text-paper-200 dark:hover:border-accent-500 dark:hover:text-accent-400"
+      >
+        ✍️ Adicionar livro manualmente
+      </button>
     </div>
   )
 }
