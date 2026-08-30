@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { autoDetectCrop, cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
+import { autoDetectQuad, fileToCoverDataUrl, warpForScan, type Quad } from '../utils/image'
 import { CropImage } from './ui/CropImage'
 import { Modal } from './ui/Modal'
 
@@ -20,7 +20,7 @@ export function CoverScanModal({ onCapture, onClose }: CoverScanModalProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [phase, setPhase] = useState<Phase>('pick')
   const [photoSrc, setPhotoSrc] = useState<string | null>(null)
-  const [autoRect, setAutoRect] = useState<CropRect | null>(null)
+  const [autoQuad, setAutoQuad] = useState<Quad | null>(null)
 
   function pickPhoto(source: 'camera' | 'gallery') {
     const input = fileRef.current
@@ -34,18 +34,18 @@ export function CoverScanModal({ onCapture, onClose }: CoverScanModalProps) {
     try {
       const src = await fileToCoverDataUrl(file, 1800, 0.92)
       setPhotoSrc(src)
-      setAutoRect(await autoDetectCrop(src).catch(() => null))
+      setAutoQuad(await autoDetectQuad(src).catch(() => null))
       setPhase('crop')
     } catch {
       setPhase('error')
     }
   }
 
-  async function handleCrop(crop: CropRect) {
+  async function handleCrop(quad: Quad) {
     if (!photoSrc) return
     setPhase('working')
     try {
-      const { cover } = await cropForScan(photoSrc, crop)
+      const { cover } = await warpForScan(photoSrc, quad)
       onCapture(cover)
       onClose()
     } catch {
@@ -91,7 +91,7 @@ export function CoverScanModal({ onCapture, onClose }: CoverScanModalProps) {
       )}
 
       {phase === 'crop' && photoSrc && (
-        <CropImage src={photoSrc} initialRect={autoRect} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
+        <CropImage src={photoSrc} initialQuad={autoQuad} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
       )}
 
       {phase === 'working' && (

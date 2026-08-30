@@ -1,89 +1,101 @@
-import { useRef, useState } from 'react'
-import type { CropRect } from '../../utils/image'
+import { useEffect, useRef, useState } from 'react'
+import { orderQuad, type Point, type Quad } from '../../utils/image'
 
 interface CropImageProps {
   src: string
-  /** Recorte inicial em coordenadas naturais da imagem (ex.: detecção automática). */
-  initialRect?: CropRect | null
-  onConfirm: (crop: CropRect) => void
+  /** Quadrilátero inicial em coordenadas naturais da imagem (ex.: detecção automática). */
+  initialQuad?: Quad | null
+  onConfirm: (quad: Quad) => void
   onCancel: () => void
 }
 
-type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se' | null
+/** Ponto guardado como fração [0,1] do tamanho exibido — imune a redimensionamento/rotação da tela. */
+type FracPoint = { x: number; y: number }
 
-const MIN_SIZE = 48 // px exibidos
+type Drag = { kind: 'corner'; index: number } | { kind: 'body'; last: Point } | null
+
+const DEFAULT_INSET = 0.06
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v
+}
 
 /**
- * Ajuste de recorte com toque: arraste os cantos para marcar só a capa
- * (o recorte vira a capa do livro e é o que o leitor de texto analisa).
+ * Ajuste de recorte com toque: arraste os quatro cantos para cercar só a capa,
+ * mesmo que a foto esteja torta. Ao confirmar, a capa é endireitada (correção
+ * de perspectiva) e vira a capa do livro — é também o que o leitor de texto analisa.
  */
-export function CropImage({ src, initialRect, onConfirm, onCancel }: CropImageProps) {
+export function CropImage({ src, initialQuad, onConfirm, onCancel }: CropImageProps) {
   const imgRef = useRef<HTMLImageElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [rect, setRect] = useState<CropRect | null>(null)
-  const drag = useRef<{ mode: DragMode; startX: number; startY: number; start: CropRect } | null>(null)
+  const [pts, setPts] = useState<FracPoint[] | null>(null)
+  const drag = useRef<Drag>(null)
+
+  // Nova foto: recomeça o recorte na próxima carga da imagem
+  useEffect(() => {
+    setPts(null)
+  }, [src])
 
   function handleImageLoad() {
     const img = imgRef.current
-    if (!img) return
-    const w = img.clientWidth
-    const h = img.clientHeight
-    if (initialRect) {
-      // Recorte detectado automaticamente (coordenadas naturais → exibidas)
-      const factor = w / img.naturalWidth
-      setRect({
-        x: Math.max(0, initialRect.x * factor),
-        y: Math.max(0, initialRect.y * factor),
-        width: Math.min(w, initialRect.width * factor),
-        height: Math.min(h, initialRect.height * factor),
-      })
+    if (!img || pts) return
+    if (initialQuad) {
+      const nw = img.naturalWidth
+      const nh = img.naturalHeight
+      setPts(initialQuad.map((p) => ({ x: clamp01(p.x / nw), y: clamp01(p.y / nh) })))
       return
     }
-    // Sem detecção: margem de 6% de cada lado
-    setRect({ x: w * 0.06, y: h * 0.06, width: w * 0.88, height: h * 0.88 })
+    const a = DEFAULT_INSET
+    const b = 1 - DEFAULT_INSET
+    setPts([
+      { x: a, y: a },
+      { x: b, y: a },
+      { x: b, y: b },
+      { x: a, y: b },
+    ])
   }
 
-  function startDrag(mode: DragMode, e: React.PointerEvent) {
-    if (!rect) return
+  function fracFromEvent(e: React.PointerEvent): Point {
+    const img = imgRef.current!
+    const r = img.getBoundingClientRect()
+    return { x: clamp01((e.clientX - r.left) / r.width), y: clamp01((e.clientY - r.top) / r.height) }
+  }
+
+  function startCorner(index: number, e: React.PointerEvent) {
     e.preventDefault()
     e.stopPropagation()
     ;(e.target as Element).setPointerCapture(e.pointerId)
-    drag.current = { mode, startX: e.clientX, startY: e.clientY, start: { ...rect } }
+    drag.current = { kind: 'corner', index }
+  }
+
+  function startBody(e: React.PointerEvent) {
+    e.preventDefault()
+    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    drag.current = { kind: 'body', last: fracFromEvent(e) }
   }
 
   function onPointerMove(e: React.PointerEvent) {
     const d = drag.current
-    const img = imgRef.current
-    if (!d || !rect || !img) return
-    const dx = e.clientX - d.startX
-    const dy = e.clientY - d.startY
-    const W = img.clientWidth
-    const H = img.clientHeight
-    const s = d.start
-    let { x, y, width, height } = s
-
-    if (d.mode === 'move') {
-      x = Math.max(0, Math.min(W - s.width, s.x + dx))
-      y = Math.max(0, Math.min(H - s.height, s.y + dy))
-    } else {
-      if (d.mode === 'nw' || d.mode === 'sw') {
-        const nx = Math.max(0, Math.min(s.x + s.width - MIN_SIZE, s.x + dx))
-        width = s.width + (s.x - nx)
-        x = nx
-      }
-      if (d.mode === 'ne' || d.mode === 'se') {
-        width = Math.max(MIN_SIZE, Math.min(W - s.x, s.width + dx))
-      }
-      if (d.mode === 'nw' || d.mode === 'ne') {
-        const ny = Math.max(0, Math.min(s.y + s.height - MIN_SIZE, s.y + dy))
-        height = s.height + (s.y - ny)
-        y = ny
-      }
-      if (d.mode === 'sw' || d.mode === 'se') {
-        height = Math.max(MIN_SIZE, Math.min(H - s.y, s.height + dy))
-      }
+    if (!d || !pts) return
+    const f = fracFromEvent(e)
+    if (d.kind === 'corner') {
+      setPts((prev) => prev!.map((p, i) => (i === d.index ? f : p)))
+      return
     }
-    setRect({ x, y, width, height })
+    // Move o quadrilátero inteiro, sem deixar nenhum canto sair da imagem
+    let mnx = 1
+    let mny = 1
+    let mxx = 0
+    let mxy = 0
+    for (const p of pts) {
+      mnx = Math.min(mnx, p.x)
+      mny = Math.min(mny, p.y)
+      mxx = Math.max(mxx, p.x)
+      mxy = Math.max(mxy, p.y)
+    }
+    const ux = Math.max(-mnx, Math.min(1 - mxx, f.x - d.last.x))
+    const uy = Math.max(-mny, Math.min(1 - mxy, f.y - d.last.y))
+    setPts((prev) => prev!.map((p) => ({ x: p.x + ux, y: p.y + uy })))
+    d.last = { x: d.last.x + ux, y: d.last.y + uy }
   }
 
   function endDrag() {
@@ -92,30 +104,27 @@ export function CropImage({ src, initialRect, onConfirm, onCancel }: CropImagePr
 
   function confirm() {
     const img = imgRef.current
-    if (!img || !rect) return
-    const factor = img.naturalWidth / img.clientWidth
-    onConfirm({
-      x: rect.x * factor,
-      y: rect.y * factor,
-      width: rect.width * factor,
-      height: rect.height * factor,
-    })
+    if (!img || !pts) return
+    const nw = img.naturalWidth
+    const nh = img.naturalHeight
+    onConfirm(orderQuad(pts.map((p) => ({ x: p.x * nw, y: p.y * nh }))))
   }
 
-  const handleClass =
-    'absolute h-9 w-9 touch-none' // área de toque generosa; o visual é o ::after abaixo
+  const polyPoints = pts ? pts.map((p) => `${p.x * 100},${p.y * 100}`).join(' ') : ''
+  const maskPath = pts
+    ? `M0,0 H100 V100 H0 Z M ${pts.map((p) => `${p.x * 100},${p.y * 100}`).join(' L ')} Z`
+    : ''
 
   return (
     <div className="space-y-3">
       <p className="text-center text-xs text-ink-500 dark:text-ink-400">
-        {initialRect
-          ? 'Recorte automático aplicado — ajuste os cantos se precisar.'
-          : 'Arraste os cantos para marcar só a capa.'}{' '}
-        O recorte vira a capa do livro e melhora a leitura do texto.
+        {initialQuad
+          ? 'Cantos detectados — arraste para ajustar se precisar.'
+          : 'Arraste os quatro cantos para cercar só a capa.'}{' '}
+        Mesmo torta, a capa é endireitada ao recortar.
       </p>
       <div
-        ref={containerRef}
-        className="relative mx-auto max-h-[55vh] w-fit touch-none select-none overflow-hidden rounded-xl"
+        className="relative mx-auto w-fit touch-none select-none"
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
@@ -125,33 +134,40 @@ export function CropImage({ src, initialRect, onConfirm, onCancel }: CropImagePr
           src={src}
           alt="Foto para recorte"
           onLoad={handleImageLoad}
-          className="max-h-[55vh] w-auto max-w-full"
+          className="block max-h-[55vh] w-auto max-w-full rounded-xl"
           draggable={false}
         />
-        {rect && (
-          <div
-            className="absolute cursor-move border-2 border-white/95 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
-            style={{ left: rect.x, top: rect.y, width: rect.width, height: rect.height }}
-            onPointerDown={(e) => startDrag('move', e)}
-          >
-            {(
-              [
-                ['nw', '-left-4 -top-4', 'cursor-nwse-resize'],
-                ['ne', '-right-4 -top-4', 'cursor-nesw-resize'],
-                ['sw', '-left-4 -bottom-4', 'cursor-nesw-resize'],
-                ['se', '-right-4 -bottom-4', 'cursor-nwse-resize'],
-              ] as const
-            ).map(([mode, pos, cursor]) => (
+        {pts && (
+          <>
+            <svg
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            >
+              <path d={maskPath} fillRule="evenodd" fill="rgba(0,0,0,0.55)" />
+              <polygon
+                points={polyPoints}
+                fill="transparent"
+                stroke="rgba(255,255,255,0.95)"
+                strokeWidth={2}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                style={{ pointerEvents: 'all', cursor: 'move' }}
+                onPointerDown={startBody}
+              />
+            </svg>
+            {pts.map((p, i) => (
               <div
-                key={mode}
-                data-handle={mode}
-                className={`${handleClass} ${pos} ${cursor} flex items-center justify-center`}
-                onPointerDown={(e) => startDrag(mode, e)}
+                key={i}
+                data-corner={i}
+                className="absolute z-10 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center"
+                style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
+                onPointerDown={(e) => startCorner(i, e)}
               >
                 <span className="h-4.5 w-4.5 rounded-full border-2 border-accent-600 bg-white shadow-sm" />
               </div>
             ))}
-          </div>
+          </>
         )}
       </div>
       <div className="flex gap-2">
@@ -167,7 +183,7 @@ export function CropImage({ src, initialRect, onConfirm, onCancel }: CropImagePr
           onClick={confirm}
           className="flex-[2] rounded-xl bg-accent-600 py-2 text-sm font-semibold text-white shadow-card transition-all hover:bg-accent-700 active:scale-[0.99]"
         >
-          ✂️ Recortar e ler a capa
+          ✂️ Recortar e endireitar
         </button>
       </div>
     </div>

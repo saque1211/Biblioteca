@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { searchBooks } from '../api/books'
 import type { ApiBookResult } from '../types'
 import { authorsLabel } from '../utils/format'
-import { autoDetectCrop, cropForScan, fileToCoverDataUrl, type CropRect } from '../utils/image'
+import { autoDetectQuad, fileToCoverDataUrl, warpForScan, type Quad } from '../utils/image'
 import { buildSearchQuery, ocrCover, parseCoverLines, resultMatchesReading, type CoverGuesses } from '../utils/scanCover'
 import { Cover } from './ui/Cover'
 import { CropImage } from './ui/CropImage'
@@ -48,27 +48,27 @@ export function ScanCoverModal({ onAddApi, onManual, onSearchMore, onClose }: Sc
     input.click()
   }
 
-  const [autoRect, setAutoRect] = useState<CropRect | null>(null)
+  const [autoQuad, setAutoQuad] = useState<Quad | null>(null)
 
   async function handleFile(file: File) {
     try {
       // Versão grande o suficiente para recorte + leitura nítida
       const src = await fileToCoverDataUrl(file, 1800, 0.92)
       setPhotoSrc(src)
-      // Detecção automática das bordas do livro (melhor esforço)
-      setAutoRect(await autoDetectCrop(src).catch(() => null))
+      // Detecção automática dos quatro cantos do livro (melhor esforço)
+      setAutoQuad(await autoDetectQuad(src).catch(() => null))
       setPhase('crop')
     } catch {
       setPhase('error')
     }
   }
 
-  async function handleCrop(crop: CropRect) {
+  async function handleCrop(quad: Quad) {
     if (!photoSrc) return
     setPhase('reading')
     setProgress(0)
     try {
-      const { cover: cropped, ocr, ocrPlain } = await cropForScan(photoSrc, crop)
+      const { cover: cropped, ocr, ocrPlain } = await warpForScan(photoSrc, quad)
       setCover(cropped)
 
       // 1ª passada: imagem realçada. A 2ª (imagem original) roda sempre que o
@@ -187,7 +187,7 @@ export function ScanCoverModal({ onAddApi, onManual, onSearchMore, onClose }: Sc
       )}
 
       {phase === 'crop' && photoSrc && (
-        <CropImage src={photoSrc} initialRect={autoRect} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
+        <CropImage src={photoSrc} initialQuad={autoQuad} onConfirm={handleCrop} onCancel={() => setPhase('pick')} />
       )}
 
       {phase === 'reading' && (
