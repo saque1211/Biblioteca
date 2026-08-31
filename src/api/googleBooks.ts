@@ -137,6 +137,28 @@ function withKey(url: string): string {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /**
+ * Junta os resultados em PT e os gerais intercalando (PT primeiro a cada
+ * rodada), sem repetir edições. Assim as edições em português são preferidas,
+ * mas o melhor resultado por relevância do Google nunca fica soterrado embaixo
+ * de uma pilha de edições em português.
+ */
+function mergePreferPt(settled: PromiseSettledResult<GoogleVolume[]>[]): GoogleVolume[] {
+  const pt = settled[0].status === 'fulfilled' ? settled[0].value : []
+  const general = settled[1].status === 'fulfilled' ? settled[1].value : []
+  const out: GoogleVolume[] = []
+  const seen = new Set<string>()
+  const max = Math.max(pt.length, general.length)
+  for (let i = 0; i < max; i++) {
+    for (const v of [pt[i], general[i]]) {
+      if (!v || seen.has(v.id)) continue
+      seen.add(v.id)
+      out.push(v)
+    }
+  }
+  return out
+}
+
+/**
  * Busca livros na Google Books API. Aceita título, autor ou ISBN.
  * Usa a chave (se configurada) e tenta de novo uma vez quando leva 429.
  */
@@ -162,18 +184,26 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
     return data.items ?? []
   }
 
-  // Busca sequencial para gastar menos cota: edições em português primeiro; só
-  // amplia para os demais idiomas se vier pouca coisa. ISBN dispensa o filtro PT.
+  // Duas buscas em paralelo: edições em português E a relevância geral do
+  // Google, juntando as duas. Buscar só em PT (langRestrict) deixava passar o
+  // resultado certo, porque o catálogo em português é enorme e mal ranqueado —
+  // a busca sem restrição é a que traz o livro óbvio no topo. Como agora há
+  // chave própria (cota dedicada), fazer as duas não pesa. ISBN dispensa o PT.
   let items: GoogleVolume[]
   if (isIsbn) {
     items = await fetchItems(base)
   } else {
-    const pt = await fetchItems(`${base}&langRestrict=pt`)
+    const settled = await Promise.allSettled([
+      fetchItems(`${base}&langRestrict=pt`),
+      fetchItems(base),
+    ])
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-    // Poucos resultados em PT: completa com a busca sem restrição de idioma
-    items = pt.length >= 5 ? pt : [...pt, ...(await fetchItems(base))]
+    items = mergePreferPt(settled)
+    // Todas as chamadas falharam: propaga para acionar o fallback da Open Library
+    if (items.length === 0 && settled.every((s) => s.status === 'rejected')) {
+      throw (settled[0] as PromiseRejectedResult).reason
+    }
   }
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 
   const results: ApiBookResult[] = []
   const seen = new Set<string>()
