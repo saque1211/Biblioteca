@@ -137,25 +137,28 @@ function withKey(url: string): string {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /**
- * Junta os resultados em PT e os gerais intercalando (PT primeiro a cada
- * rodada), sem repetir edições. Assim as edições em português são preferidas,
- * mas o melhor resultado por relevância do Google nunca fica soterrado embaixo
- * de uma pilha de edições em português.
+ * Junta os resultados da busca em português e da busca geral, sem repetir
+ * edições, colocando as edições em português na FRENTE (na ordem de relevância
+ * do Google) e as demais logo abaixo, como alternativa. Como o app é
+ * português-primeiro, assim uma edição em inglês só é escolhida quando não
+ * existe a equivalente em português — mas ela ainda aparece (fallback), então
+ * livros que só existem em inglês continuam sendo encontrados.
  */
 function mergePreferPt(settled: PromiseSettledResult<GoogleVolume[]>[]): GoogleVolume[] {
-  const pt = settled[0].status === 'fulfilled' ? settled[0].value : []
+  const ptResults = settled[0].status === 'fulfilled' ? settled[0].value : []
   const general = settled[1].status === 'fulfilled' ? settled[1].value : []
-  const out: GoogleVolume[] = []
+  // Veio da busca restrita a PT, ou o próprio volume está marcado como pt
+  const ptIds = new Set(ptResults.map((v) => v.id))
+  const preferPt = (v: GoogleVolume) => ptIds.has(v.id) || v.volumeInfo?.language === 'pt'
+
+  const combined: GoogleVolume[] = []
   const seen = new Set<string>()
-  const max = Math.max(pt.length, general.length)
-  for (let i = 0; i < max; i++) {
-    for (const v of [pt[i], general[i]]) {
-      if (!v || seen.has(v.id)) continue
-      seen.add(v.id)
-      out.push(v)
-    }
+  for (const v of [...ptResults, ...general]) {
+    if (seen.has(v.id)) continue
+    seen.add(v.id)
+    combined.push(v)
   }
-  return out
+  return [...combined.filter(preferPt), ...combined.filter((v) => !preferPt(v))]
 }
 
 /**
@@ -184,11 +187,12 @@ export async function searchGoogleBooks(query: string, signal?: AbortSignal): Pr
     return data.items ?? []
   }
 
-  // Duas buscas em paralelo: edições em português E a relevância geral do
-  // Google, juntando as duas. Buscar só em PT (langRestrict) deixava passar o
-  // resultado certo, porque o catálogo em português é enorme e mal ranqueado —
-  // a busca sem restrição é a que traz o livro óbvio no topo. Como agora há
-  // chave própria (cota dedicada), fazer as duas não pesa. ISBN dispensa o PT.
+  // Duas buscas em paralelo: a restrita a português E a geral (todos os
+  // idiomas). Só a busca PT deixava passar livros que o Google indexa melhor
+  // sem restrição; só a geral traria edições em inglês para quem procura em
+  // português. Juntando as duas (com PT na frente, ver mergePreferPt) achamos
+  // o livro e preferimos a edição em português. Como há chave própria (cota
+  // dedicada), fazer as duas não pesa. ISBN identifica a edição e dispensa o PT.
   let items: GoogleVolume[]
   if (isIsbn) {
     items = await fetchItems(base)
